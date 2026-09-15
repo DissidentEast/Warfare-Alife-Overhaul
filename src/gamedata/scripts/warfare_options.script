@@ -309,11 +309,6 @@ function update_settings()
         options.factions[faction].behavior = behavior
     end
 
-    if (options.all_out_war) then
-        warfare_log.info("warfare_options: all_out_war flagged for apply")
-        warfare.need_all_out_war_applied = true
-    end
-
     -- TODO: remove in a few versions - write computed max values back so older installs can still read them from settings
     for _, faction in pairs(warfare_factions.factions) do
         local base = "alife/warfare/" .. faction .. "/"

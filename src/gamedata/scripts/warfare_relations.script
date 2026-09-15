@@ -307,7 +307,7 @@ end
 
 --- The whole-number change a pair may actually take, plus the relation and anchor it was measured
 --- against. The window constrains movement outward only: a value already past it (every pair at
---- -4000 in an all_out_war game) stays put and may still move back in.
+--- warfare.ALL_OUT_WAR_RELATION in an all_out_war game) stays put and may still move back in.
 local function clamp_step(a, b, key, delta, cfg)
     if delta == 0 then
         return 0

@@ -104,11 +104,8 @@ function get_time_ref()
     return game.get_game_time()
 end
 
--- Variable to see if all_out_war was applied at the start of a new game (maintain compatibility with dynamic relations)
+-- Saved: all_out_war seeds the relation matrix once per game, never on a later load.
 all_out_war_applied = false
-
--- Variable to see if all_out_war was applied after loading a save.
-need_all_out_war_applied = true
 dynamic_relations_installed = false
 
 -- Special squads to ignore in offline combat and to ignore when assigning targets
@@ -203,23 +200,26 @@ function spawn_squad(section, smart, kind)
     return squad
 end
 
+ALL_OUT_WAR_RELATION = -2000
+
 function apply_all_out_war()
-    warfare_log.info("apply_all_out_war: setting all faction relations to -4000 (actor_faction=%s)", actor_faction)
+    local r = ALL_OUT_WAR_RELATION
+    warfare_log.info("apply_all_out_war: setting all faction relations to %s (actor_faction=%s)", r, actor_faction)
     for i, faction in pairs(warfare_factions.factions) do
         for j, faction2 in pairs(warfare_factions.factions) do
             if (faction ~= faction2) then
                 warfare_log.trace("apply_all_out_war: %s vs %s", faction, faction2)
-                game_relations.set_factions_community(faction, faction2, -4000)
+                game_relations.set_factions_community(faction, faction2, r)
 
                 if (dynamic_relations_installed) then
-                    save_var(db.actor, ("drx_df_" .. faction .. "_" .. faction2 .. "_relations"), -4000)
-                    save_var(db.actor, ("drx_df_" .. faction2 .. "_" .. faction .. "_relations"), -4000)
+                    save_var(db.actor, ("drx_df_" .. faction .. "_" .. faction2 .. "_relations"), r)
+                    save_var(db.actor, ("drx_df_" .. faction2 .. "_" .. faction .. "_relations"), r)
                 end
 
                 if (actor_faction == faction) then
-                    game_relations.set_factions_community("actor_" .. faction, faction2, -4000)
+                    game_relations.set_factions_community("actor_" .. faction, faction2, r)
                 elseif (actor_faction == faction2) then
-                    game_relations.set_factions_community(faction, "actor_" .. faction2, -4000)
+                    game_relations.set_factions_community(faction, "actor_" .. faction2, r)
                 end
             end
         end
@@ -275,17 +275,6 @@ function actor_on_first_update()
     actor_faction = get_actor_true_community() or alife():actor():community():sub(7)
     warfare_log.info("actor_on_first_update: actor_faction=%s", actor_faction)
     give_info("actor_made_wish_for_peace")
-
-    if (warfare_options.options.all_out_war) then
-        warfare_log.info("actor_on_first_update: all_out_war enabled, setting -5000 relations")
-        for i, f in pairs(warfare_factions.factions) do
-            for j, f2 in pairs(warfare_factions.factions) do
-                if f ~= f2 then
-                    game_relations.set_factions_community_num(f, f2, -5000)
-                end
-            end
-        end
-    end
 end
 
 -- Runs from the actor_on_update one-shot init, after every actor_on_first_update handler:
@@ -795,13 +784,9 @@ function actor_on_update()
             warfare_log.info("actor_on_update: dynamic_relations detected")
         end
 
-        if (dynamic_relations_installed) then
-            if (not all_out_war_applied and warfare_options.options.all_out_war) then
-                apply_all_out_war()
-                all_out_war_applied = true
-            end
-        elseif (warfare_options.options.all_out_war) then
+        if (not all_out_war_applied and warfare_options.options.all_out_war) then
             apply_all_out_war()
+            all_out_war_applied = true
         end
 
         build_level_information()

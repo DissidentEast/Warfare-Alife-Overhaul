@@ -25,6 +25,9 @@
 	<string id="ui_mm_prst_warfare_alifeoverhaul_balanced">
 		<text>Alife Overhaul - Balanced</text>
 	</string>
+	<string id="ui_mm_prst_warfare_alifeoverhaul_all_out_war">
+		<text>Alife Overhaul - All Out War</text>
+	</string>
 	<string id="ui_mm_alife_warfare_general_use_old_auto_capture">
 		<text>Use old auto-capture method</text>
 	</string>

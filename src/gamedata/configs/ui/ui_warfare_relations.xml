@@ -1,19 +1,19 @@
 <w>
-	<!-- Templates for ui_pda_relations_warfare. Every node is created by script, positioned by
-	     script, and parented to the relations tab window; x/y here are placeholders unless noted. -->
+	<!-- Templates for ui_pda_relations_warfare. Every node is created and parented by script;
+	     nodes without width/height are also sized by script. -->
 	<tab>
 		<!-- own matrix -->
-		<grid_v x="0" y="0" width="1" height="364" stretch="1">
+		<grid_v x="0" y="0" stretch="1">
 			<texture>ui_inGame2_pda_line_vertical</texture>
 		</grid_v>
-		<grid_h x="0" y="0" width="684" height="1" stretch="1">
+		<grid_h x="0" y="0" stretch="1">
 			<texture>ui_inGame2_pda_line_horizontal</texture>
 		</grid_h>
-		<faction_logo x="0" y="0" width="43" height="24" stretch="1"/>
-		<goodwill_label width="60" height="28">
+		<faction_logo x="0" y="0" stretch="1"/>
+		<goodwill_label>
 			<text align="c" font="letterica18" r="220" g="220" b="220"/>
 		</goodwill_label>
-		<cell_value width="57" height="28">
+		<cell_value>
 			<text align="c" vert_align="c" font="letterica18" r="220" g="220" b="220"/>
 		</cell_value>
 		<status_left x="40" y="30" width="320" height="18">
@@ -24,7 +24,7 @@
 		</status_right>
 
 		<!-- both modes -->
-		<cell_arrow x="0" y="0" width="4" height="9" stretch="1"/>
+		<cell_arrow x="0" y="0" stretch="1"/>
 
 		<!-- SAFR overlay: the strip between SAFR's grid (ends at tab y=435) and the companion
 		     frame (starts at tab y=457) -->

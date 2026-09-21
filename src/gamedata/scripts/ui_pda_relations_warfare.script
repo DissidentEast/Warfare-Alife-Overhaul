@@ -2,7 +2,7 @@
 ---
 --- The matrix is described to the shared code by a grid table built once per tab instance:
 ---   list            faction codes, one per column
----   rows            highest row index (rows run 0..rows)
+---   last_row        highest row index (rows run 0..last_row)
 ---   row(k)          faction code for row k; nil for the actor goodwill row; false for a row
 ---                   warfare has nothing to say about
 ---   arrow[k][i]     warfare-owned CUIStatic per cell, hidden by default
@@ -19,9 +19,7 @@
 --- control on the tab is still built and driven by vanilla code. ui_pda_relations_warfare_safr
 --- overlays SAFR's matrix instead when that mod owns the tab class.
 ---
---- All three overrides chain to the original. modxml_portrait_cover wraps Reset from its own
---- on_game_start; replacing rather than wrapping would drop that patch or be dropped by it,
---- depending on which on_game_start ran first.
+--- All three overrides chain to the original: modxml_portrait_cover also wraps Reset.
 
 local TEMPLATES = "ui_warfare_relations.xml"
 
@@ -35,8 +33,8 @@ local LABEL_W = 60
 -- layout unit is ~1.333 times wider than it is tall. Art sized here has to be pre-squashed by that
 -- factor to come out at its own proportions: ui_inGame4_ico_* is 127x56, and 43x24 renders as
 -- about 57x24 - vanilla's own ratio for this art.
-local LOGO_W = 43               -- ui_inGame4_ico_* are 127x56 banners, not square emblems
-local LOGO_H = 24               -- 43x24 is vanilla's own ratio for this art (101x56 in pda_warfare)
+local LOGO_W = 43
+local LOGO_H = 24
 local HEADER_Y = 56
 local ARROW_W = 4               -- 16x27 art with no padding, so the box is the arrow
 local ARROW_H = 9
@@ -48,7 +46,6 @@ local ARROW_DY = 1
 local REFRESH_SEC = 60
 
 -- Muted against the cell values, which keep the saturated palette vanilla chose for standings.
--- The arrow is a footnote to the number, not a second reading of it.
 local CLR_UP = GetARGB(255, 110, 165, 110)
 local CLR_DOWN = GetARGB(255, 180, 100, 95)
 -- The pair has spent its allowance: it moved, and cannot move again until tomorrow.
@@ -66,16 +63,12 @@ local function signed(n)
 end
 
 local function roster()
-    local out = {}
     local factions = game_relations.factions_table
     if not factions then
         warfare_log.err("ui_pda_relations_warfare.roster: game_relations.factions_table missing")
-        return out
+        return {}
     end
-    for i = 1, #factions do
-        out[i] = factions[i]
-    end
-    return out
+    return factions
 end
 
 local function logo(xml, tab, faction, x, y)
@@ -88,7 +81,7 @@ local function logo(xml, tab, faction, x, y)
 end
 
 --- A hidden arrow in the top-right corner of the cell whose left edge, top edge and width are
---- given. Direction only: the size of the move is in the hint; a number here crowds the value.
+--- given.
 function cell_arrow(xml, tab, x, y, w)
     local a = xml:InitStatic("tab:cell_arrow", tab)
     a:SetStretchTexture(true)
@@ -106,14 +99,13 @@ end
 local own = { name = "own" }
 
 function own.prepare(self)
-    self.wf_columns = roster()
     self.list = {}
 end
 
 --- Every Init call returns a fresh window, so the layout carries one template per kind of node and
 --- this draws as many of each as the roster needs.
 function own.build(self, xml)
-    local list = self.wf_columns
+    local list = roster()
     local cols = #list
     if cols == 0 then
         return nil
@@ -140,7 +132,7 @@ function own.build(self, xml)
 
     local grid = {
         list = list,
-        rows = cols,
+        last_row = cols,
         arrow = {},
         value = {},
         dx = COL_W,
@@ -271,7 +263,7 @@ local function fill(self)
 
     fill_status(wf, paced, cfg)
 
-    for k = 0, wf.rows do
+    for k = 0, wf.last_row do
         local row = wf.row(k)
         if row ~= false then
             for i = 1, #list do
@@ -300,19 +292,16 @@ local function fill(self)
     end
 end
 
---- Indexed off a real cell's rect rather than the tab's, so nothing is assumed about how the engine
---- placed the grid: the cells are one pitch apart in whatever space that rect is in.
+--- Indexed off a real cell's absolute rect: the cells are one pitch apart in whatever space that
+--- rect is in.
 local function cell_at(self, pos)
     local wf = self.wf
     local cols = #wf.list
-    if cols == 0 or not wf.origin or wf.dx <= 0 or wf.dy <= 0 then
-        return nil
-    end
     local rect = Frect():set(0, 0, 0, 0)
     wf.origin:GetAbsoluteRect(rect)
     local x = pos.x - rect.x1
     local y = pos.y - rect.y1
-    if x < 0 or y < 0 or x >= cols * wf.dx or y >= (wf.rows + 1) * wf.dy then
+    if x < 0 or y < 0 or x >= cols * wf.dx or y >= (wf.last_row + 1) * wf.dy then
         return nil
     end
     local k = math.floor(y / wf.dy)
@@ -322,7 +311,7 @@ local function cell_at(self, pos)
     return k, math.floor(x / wf.dx) + 1
 end
 
---- The headers are faction logos and the badge is a bare arrow, so everything else is here.
+--- The headers are faction logos and the badge is a bare arrow; the hint carries the numbers.
 local function hint_text(self, k, i)
     local col = self.wf.list[i]
     local row = self.wf.row(k)
@@ -397,8 +386,8 @@ function on_game_start()
             -- to that window afterwards is inside the fresh delay window and is refused, every
             -- frame, forever.
             self.wf_hint = utils_ui.UIHint(self)
-            warfare_log.debug("ui_pda_relations_warfare.build: %s grid, %s columns, %s rows",
-                ctor.name, #self.wf.list, self.wf.rows + 1)
+            warfare_log.debug("ui_pda_relations_warfare.InitControls: %s grid, %s columns, %s rows",
+                ctor.name, #self.wf.list, self.wf.last_row + 1)
         end
         return res
     end

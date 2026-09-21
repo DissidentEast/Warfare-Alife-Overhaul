@@ -18,8 +18,7 @@
 ---                          detect it
 ---
 --- Arrows and the per-cell hint show only on "current" pages, the status line only in the
---- relations category: a "moved today" badge beside a two-week delta or a kill count would read
---- as part of that number.
+--- relations category.
 
 name = "safr"
 
@@ -31,8 +30,7 @@ function prepare(self)
 end
 
 local function page(self)
-    local cat = self.page_desc and self.page_desc[self.page_cat]
-    return cat and cat[self.page]
+    return self.page_desc[self.page_cat][self.page]
 end
 
 function build(self, xml)
@@ -51,7 +49,7 @@ function build(self, xml)
     local max_k = #rel[1]
     local off = (max_k == cols + 1) and 1 or 0
 
-    local grid = { list = list, rows = max_k, arrow = {} }
+    local grid = { list = list, last_row = max_k, arrow = {} }
     function grid.row(k)
         if k < off then
             return false
@@ -63,7 +61,7 @@ function build(self, xml)
     end
     function grid.arrows_on()
         local p = page(self)
-        return (p and p.pg_type == "current") and true or false
+        return p.pg_type == "current"
     end
     function grid.status_on()
         return self.page_cat == 1
@@ -73,11 +71,11 @@ function build(self, xml)
     local opos = origin:GetWndPos()
     grid.origin = origin
     grid.dx = (cols >= 2) and (rel[2][0]:GetWndPos().x - opos.x) or origin:GetWidth()
-    grid.dy = (max_k >= 1) and (rel[1][1]:GetWndPos().y - opos.y) or origin:GetHeight()
+    grid.dy = rel[1][1]:GetWndPos().y - opos.y
 
     for k = 0, max_k do
-        grid.arrow[k] = {}
         if grid.row(k) ~= false then
+            grid.arrow[k] = {}
             for i = 1, cols do
                 local cell = rel[i][k]
                 local pos = cell:GetWndPos()

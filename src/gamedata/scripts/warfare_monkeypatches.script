@@ -65,43 +65,6 @@ function dialogs_jupiter.ecolog_companion_task_2_complete_task(a, b)
     b:stop_talk()
 end
 
---[[
--- Warfare documents selling patch for dialogs.script - defer to hard change for now, since people are still having issues
-old_trade_important_documents = dialogs.st_trade_important_documents
-function dialogs.st_trade_important_documents(a,b,typ,txt)
-    if IsWarfare() then
-        local important_docs_warfare_names = {
-            ["stalker"] = "bar_visitors_barman_stalker_trader",
-            ["bandit"] = "zat_b7_bandit_boss_sultan",
-            ["csky"] = "mar_smart_terrain_base_stalker_leader_marsh",
-            ["dolg"] = "bar_dolg_leader",
-            ["army"] = "agr_smart_terrain_1_6_near_2_military_colonel_kovalski",
-            ["killer"] = "cit_killers_merc_trader_stalker",
-            ["ecolog"] = "yan_stalker_sakharov",
-            ["freedom"] = "mil_smart_terrain_7_7_freedom_leader_stalker",
-        }
-        
-        local npc = dialogs.who_is_npc(a, b)
-        local npc_name
-        local se_obj = alife_object(npc:id())
-        local comm = se_obj:community()
-        npc_name = important_docs_warfare_names[comm]
-        if not npc_name then
-            npc_name = npc:section()
-            if npc_name == "m_trader" then
-                npc_name = npc:name()
-            end
-        end
-        
-        local str = game.translate_string("st_trade_important_documents_".. typ .. "_" .. npc_name)
-        str = strformat(str,txt)
-        return str
-    end
-    
-    old_trade_important_documents(a,b,typ,txt)
-end
---]]
-
 local function has_dynamic_pda_tabs()
     local ok, supported = pcall(function()
         return pda_dynamic_tabs and type(pda_dynamic_tabs.register) == "function"
@@ -146,24 +109,37 @@ function pda.set_active_subdialog(section)
     return ret
 end
 
+-- dialogs.script only maps 8 faction communities when WARFARE is set and
+-- concatenates nil for anyone else (e.g. Barman: community "trader").
+local important_docs_warfare_names = {
+    ["stalker"] = "bar_visitors_barman_stalker_trader",
+    ["bandit"] = "zat_b7_bandit_boss_sultan",
+    ["csky"] = "mar_smart_terrain_base_stalker_leader_marsh",
+    ["dolg"] = "bar_dolg_leader",
+    ["army"] = "agr_smart_terrain_1_6_near_2_military_colonel_kovalski",
+    ["killer"] = "cit_killers_merc_trader_stalker",
+    ["ecolog"] = "yan_stalker_sakharov",
+    ["freedom"] = "mil_smart_terrain_7_7_freedom_leader_stalker",
+}
+
 local dialogs_st_trade_important_documents = dialogs.st_trade_important_documents
 function dialogs.st_trade_important_documents(a, b, typ, txt)
-    local trade_dialog = dialogs_st_trade_important_documents(a, b, typ, txt)
-    if not (_G.WARFARE and trade_dialog:sub(-1) == "_") then
-        return trade_dialog
+    if not _G.WARFARE then
+        return dialogs_st_trade_important_documents(a, b, typ, txt)
     end
 
-    local npc = who_is_npc(a, b)
-    local npc_name = npc:section()
-    if npc_name ~= "m_trader" then
-        return trade_dialog
+    local npc = dialogs.who_is_npc(a, b)
+    local se_obj = alife_object(npc:id())
+    local npc_name = se_obj and important_docs_warfare_names[se_obj:community()]
+    if not npc_name then
+        npc_name = npc:section()
+        if npc_name == "m_trader" then
+            npc_name = npc:name()
+        end
     end
-    npc_name = npc:name()
-    warfare_log.debug("st_trade_important_documents: warfare m_trader path npc=%s typ=%s", tostring(npc_name), tostring(typ))
 
     local str = game.translate_string("st_trade_important_documents_" .. typ .. "_" .. npc_name)
-    str = strformat(str, txt)
-    return str
+    return strformat(str, txt)
 end
 
 -- faction_expansions.script mutant spawn patches

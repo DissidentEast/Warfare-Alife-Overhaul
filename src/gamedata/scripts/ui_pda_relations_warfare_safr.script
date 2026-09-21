@@ -1,0 +1,93 @@
+--- Grid constructor for ui_pda_relations_warfare over the matrix drawn by Show All Faction
+--- Relations in PDA (dEmergence, "SAFR"). SAFR replaces pda_relations_tab.InitControls and Reset
+--- and repopulates self.list inside them, so its grid is kept and warfare only adds arrows over its
+--- cells and a status line under the grid. SAFR's cell text and colour are never written.
+---
+--- What this relies on in SAFR (6.4.4):
+---   self.list              visible faction codes in column order; may be a subset, may hold
+---                          factions warfare does not pace
+---   self.relations[i][k]   CUITextWnd for column i (1..#list), row k (0..max); all children of
+---                          self.tab on a uniform pitch
+---   row layout             with SAFR's squad-count row on: k=0 squad count, k=1 goodwill,
+---                          k>=2 faction list[k-1]; off: k=0 goodwill, k>=1 faction list[k].
+---                          The toggle is a SAFR-local, so presence is derived from row count.
+---   orientation            row faction sees column faction, same as vanilla
+---   self.page_desc[self.page_cat][self.page].pg_type   "current" | "history" | "killcount" |
+---                          "default"; page_cat 1 is relations, 2 is casualties
+---   RefreshKnownFactionsList   present on the class across SAFR's renames; the marker used to
+---                          detect it
+---
+--- Arrows and the per-cell hint show only on "current" pages, the status line only in the
+--- relations category: a "moved today" badge beside a two-week delta or a kill count would read
+--- as part of that number.
+
+name = "safr"
+
+function owns(cls)
+    return type(cls.RefreshKnownFactionsList) == "function"
+end
+
+function prepare(self)
+end
+
+local function page(self)
+    local cat = self.page_desc and self.page_desc[self.page_cat]
+    return cat and cat[self.page]
+end
+
+function build(self, xml)
+    local rel = self.relations
+    local list = {}
+    for i = 1, #(self.list or {}) do
+        list[i] = self.list[i]
+    end
+    local cols = #list
+    if cols == 0 or not (rel and rel[1] and rel[1][0] and self.page_desc) then
+        warfare_log.err("ui_pda_relations_warfare_safr.build: SAFR matrix not found, no overlay")
+        return nil
+    end
+
+    local tab = self.tab
+    local max_k = #rel[1]
+    local off = (max_k == cols + 1) and 1 or 0
+
+    local grid = { list = list, rows = max_k, arrow = {} }
+    function grid.row(k)
+        if k < off then
+            return false
+        end
+        if k == off then
+            return nil
+        end
+        return list[k - off]
+    end
+    function grid.arrows_on()
+        local p = page(self)
+        return (p and p.pg_type == "current") and true or false
+    end
+    function grid.status_on()
+        return self.page_cat == 1
+    end
+
+    local origin = rel[1][0]
+    local opos = origin:GetWndPos()
+    grid.origin = origin
+    grid.dx = (cols >= 2) and (rel[2][0]:GetWndPos().x - opos.x) or origin:GetWidth()
+    grid.dy = (max_k >= 1) and (rel[1][1]:GetWndPos().y - opos.y) or origin:GetHeight()
+
+    for k = 0, max_k do
+        grid.arrow[k] = {}
+        if grid.row(k) ~= false then
+            for i = 1, cols do
+                local cell = rel[i][k]
+                local pos = cell:GetWndPos()
+                grid.arrow[k][i] = ui_pda_relations_warfare.cell_arrow(xml, tab, pos.x, pos.y,
+                    cell:GetWidth())
+            end
+        end
+    end
+
+    grid.status_left = xml:InitTextWnd("tab:safr_status_left", tab)
+    grid.status_right = xml:InitTextWnd("tab:safr_status_right", tab)
+    return grid
+end

@@ -1,17 +1,29 @@
---- The vanilla Relations tab, rebuilt over the whole faction roster and annotated with the way
---- warfare has moved each pair today.
+--- The vanilla Relations tab, annotated with the way warfare has moved each pair today.
 ---
---- Vanilla lists nine factions and swaps one out when the player is Renegade, Sin or ISG. Warfare
---- moves all twelve, so all twelve are shown.
+--- The matrix is described to the shared code by a grid table built once per tab instance:
+---   list            faction codes, one per column
+---   rows            highest row index (rows run 0..rows)
+---   row(k)          faction code for row k; nil for the actor goodwill row; false for a row
+---                   warfare has nothing to say about
+---   arrow[k][i]     warfare-owned CUIStatic per cell, hidden by default
+---   value[k][i]     optional CUITextWnd per cell that warfare fills; absent when another mod owns
+---                   the cell text
+---   status_left/right   the two status TextWnds
+---   origin, dx, dy  cell [row 0][col 1] and the pitch between neighbours, for the hit test
+---   arrows_on()     whether arrows and the per-cell hint may show right now
+---   status_on()     whether the status line may show right now
 ---
---- Vanilla's own matrix is suppressed rather than torn down: emptying self.list before its
---- InitControls runs leaves its build and fill loops with nothing to iterate, so every other
---- control on the tab - the frame, the caption, the value-mode button, the companion roster - is
---- still built and driven by vanilla code.
+--- Two grid constructors exist. The one here draws warfare's own 12-faction matrix: vanilla lists
+--- nine factions and its matrix is suppressed rather than torn down - emptying self.list before
+--- its InitControls runs leaves its build and fill loops with nothing to iterate, so every other
+--- control on the tab is still built and driven by vanilla code. ui_pda_relations_warfare_safr
+--- overlays SAFR's matrix instead when that mod owns the tab class.
 ---
 --- All three overrides chain to the original. modxml_portrait_cover wraps Reset from its own
 --- on_game_start; replacing rather than wrapping would drop that patch or be dropped by it,
 --- depending on which on_game_start ran first.
+
+local TEMPLATES = "ui_warfare_relations.xml"
 
 local GRID_X = 100              -- tab-relative, and what the layout's backdrop is sized to
 local GRID_Y = 84
@@ -75,17 +87,38 @@ local function logo(xml, tab, faction, x, y)
     return ico
 end
 
+--- A hidden arrow in the top-right corner of the cell whose left edge, top edge and width are
+--- given. Direction only: the size of the move is in the hint; a number here crowds the value.
+function cell_arrow(xml, tab, x, y, w)
+    local a = xml:InitStatic("tab:cell_arrow", tab)
+    a:SetStretchTexture(true)
+    a:SetWndPos(vector2():set(x + w - ARROW_W - ARROW_DX, y + ARROW_DY))
+    a:SetWndSize(vector2():set(ARROW_W, ARROW_H))
+    a:Show(false)
+    return a
+end
+
+local function always()
+    return true
+end
+
+-- Warfare's own matrix.
+local own = { name = "own" }
+
+function own.prepare(self)
+    self.wf_columns = roster()
+    self.list = {}
+end
+
 --- Every Init call returns a fresh window, so the layout carries one template per kind of node and
 --- this draws as many of each as the roster needs.
-local function build(self)
-    local list = self.wf_list
+function own.build(self, xml)
+    local list = self.wf_columns
     local cols = #list
     if cols == 0 then
-        return
+        return nil
     end
 
-    local xml = CScriptXmlInit()
-    xml:ParseFile("pda_relations.xml")
     local tab = self.tab
     local rows = cols + 1       -- row 0 is the actor's standing with each faction
 
@@ -105,13 +138,28 @@ local function build(self)
             HEADER_Y)
     end
 
-    self.wf_value = {}
-    self.wf_arrow = {}
+    local grid = {
+        list = list,
+        rows = cols,
+        arrow = {},
+        value = {},
+        dx = COL_W,
+        dy = ROW_H,
+        arrows_on = always,
+        status_on = always,
+    }
+    function grid.row(k)
+        if k == 0 then
+            return nil
+        end
+        return list[k]
+    end
+
     for k = 0, cols do
         local y = GRID_Y + k * ROW_H
 
         if k == 0 then
-            local label = xml:InitTextWnd("tab:faction", tab)
+            local label = xml:InitTextWnd("tab:goodwill_label", tab)
             label:SetWndPos(vector2():set(LABEL_X, y))
             label:SetWndSize(vector2():set(LABEL_W, ROW_H))
             label:SetText(game.translate_string("st_ui_goodwill_name"))
@@ -120,8 +168,8 @@ local function build(self)
                 y + math.floor((ROW_H - LOGO_H) / 2))
         end
 
-        self.wf_value[k] = {}
-        self.wf_arrow[k] = {}
+        grid.value[k] = {}
+        grid.arrow[k] = {}
         for i = 1, cols do
             local x = GRID_X + (i - 1) * COL_W
 
@@ -129,27 +177,15 @@ local function build(self)
             local cell = xml:InitTextWnd("tab:cell_value", tab)
             cell:SetWndPos(vector2():set(x, y))
             cell:SetWndSize(vector2():set(COL_W, ROW_H))
-            self.wf_value[k][i] = cell
-
-            -- Direction only. The size of the move is in the hint; a number here crowds the value.
-            local arrow = xml:InitStatic("tab:cell_arrow", tab)
-            arrow:SetStretchTexture(true)
-            arrow:SetWndPos(vector2():set(x + COL_W - ARROW_W - ARROW_DX, y + ARROW_DY))
-            arrow:SetWndSize(vector2():set(ARROW_W, ARROW_H))
-            arrow:Show(false)
-            self.wf_arrow[k][i] = arrow
+            grid.value[k][i] = cell
+            grid.arrow[k][i] = cell_arrow(xml, tab, x, y, COL_W)
         end
     end
+    grid.origin = grid.value[0][1]
 
-    self.wf_status_left = xml:InitTextWnd("tab:status_left", tab)
-    self.wf_status_right = xml:InitTextWnd("tab:status_right", tab)
-
-    -- Its own hint, not the tab's: vanilla ends every Update with a bare hint_wnd:Update(), and
-    -- UIHint:Pass treats that as "no text" and rearms its delay timer. Anything written to that
-    -- window afterwards is inside the fresh delay window and is refused, every frame, forever.
-    self.wf_hint = utils_ui.UIHint(self)
-
-    warfare_log.debug("ui_pda_relations_warfare.build: %s columns, %s rows", cols, rows)
+    grid.status_left = xml:InitTextWnd("tab:status_left", tab)
+    grid.status_right = xml:InitTextWnd("tab:status_right", tab)
+    return grid
 end
 
 local function goodwill_string(v)
@@ -168,10 +204,16 @@ local function goodwill_string(v)
     return "st_ui_goodwill_1"
 end
 
-local function fill_status(self, paced, cfg)
+local function fill_status(wf, paced, cfg)
+    if not wf.status_on() then
+        wf.status_left:SetText("")
+        wf.status_right:SetText("")
+        return
+    end
+
     if not paced then
-        self.wf_status_left:SetText(game.translate_string("st_wrfr_rel_static"))
-        self.wf_status_right:SetText("")
+        wf.status_left:SetText(game.translate_string("st_wrfr_rel_static"))
+        wf.status_right:SetText("")
         return
     end
 
@@ -179,71 +221,78 @@ local function fill_status(self, paced, cfg)
     if remaining < 0 then
         remaining = 0
     end
-    self.wf_status_left:SetText(strformat(game.translate_string("st_wrfr_rel_flush"),
+    wf.status_left:SetText(strformat(game.translate_string("st_wrfr_rel_flush"),
         smart_terrain_warfare.format_game_minutes(math.floor(remaining / 60))))
 
     if cfg.budget > 0 then
-        self.wf_status_right:SetText(strformat(game.translate_string("st_wrfr_rel_budget"),
+        wf.status_right:SetText(strformat(game.translate_string("st_wrfr_rel_budget"),
             cfg.budget))
     else
-        self.wf_status_right:SetText(game.translate_string("st_wrfr_rel_nolimit"))
+        wf.status_right:SetText(game.translate_string("st_wrfr_rel_nolimit"))
     end
 end
 
---- Cell (row k, column i) is how faction k sees faction i, which is the orientation vanilla used.
---- Row 0 is the actor's goodwill with each faction - a different registry, not symmetric with
---- anything else in the grid, and never something warfare paces.
-local function fill(self)
-    local list = self.wf_list
-    local cols = #list
+local function fill_value(self, cell, row, col)
     local as_text = self.to_text
+    if not row then
+        local g = relation_registry.community_goodwill(col, AC_ID)
+        cell:SetTextColor((g >= 2000 and self.clr_green)
+            or (g >= 500 and self.clr_yellow) or self.clr_red)
+        cell:SetText(as_text and game.translate_string(goodwill_string(g)) or tostring(g))
+        return
+    end
+    local r = relation_registry.community_relation(row, col)
+    local state = "st_goodwill_indifferent"
+    if r >= game_relations.FRIENDS then
+        cell:SetTextColor(self.clr_green)
+        state = "st_goodwill_friendly"
+    elseif r <= game_relations.ENEMIES then
+        cell:SetTextColor(self.clr_red)
+        state = "st_goodwill_enemy"
+    else
+        cell:SetTextColor(self.clr_yellow)
+    end
+    cell:SetText(as_text and game.translate_string(state) or tostring(r))
+end
+
+--- Cell (row k, column i) is how faction k sees faction i, which is the orientation vanilla used.
+--- The goodwill row is the actor's standing with each faction - a different registry, not
+--- symmetric with anything else in the grid, and never something warfare paces.
+local function fill(self)
+    local wf = self.wf
+    local list = wf.list
     local paced = pacing_on()
     local cfg = paced and warfare_relations.settings() or nil
+    local show_arrows = paced and wf.arrows_on()
 
     -- Kept for the hint, which runs per frame and must agree with what the arrows are showing.
     self.wf_paced = paced
     self.wf_cfg = cfg
 
-    fill_status(self, paced, cfg)
+    fill_status(wf, paced, cfg)
 
-    for k = 0, cols do
-        local row = list[k]
-        for i = 1, cols do
-            local col = list[i]
-            local cell = self.wf_value[k][i]
-            local arrow = self.wf_arrow[k][i]
+    for k = 0, wf.rows do
+        local row = wf.row(k)
+        if row ~= false then
+            for i = 1, #list do
+                local col = list[i]
+                local a = wf.arrow[k][i]
+                a:Show(false)
 
-            arrow:Show(false)
-
-            if not row then
-                local g = relation_registry.community_goodwill(col, AC_ID)
-                cell:SetTextColor((g >= 2000 and self.clr_green)
-                    or (g >= 500 and self.clr_yellow) or self.clr_red)
-                cell:SetText(as_text and game.translate_string(goodwill_string(g)) or tostring(g))
-            else
-                local r = relation_registry.community_relation(row, col)
-                local state = "st_goodwill_indifferent"
-                if r >= game_relations.FRIENDS then
-                    cell:SetTextColor(self.clr_green)
-                    state = "st_goodwill_friendly"
-                elseif r <= game_relations.ENEMIES then
-                    cell:SetTextColor(self.clr_red)
-                    state = "st_goodwill_enemy"
-                else
-                    cell:SetTextColor(self.clr_yellow)
+                if wf.value then
+                    fill_value(self, wf.value[k][i], row, col)
                 end
-                cell:SetText(as_text and game.translate_string(state) or tostring(r))
 
-                if paced and warfare_relations.pair_allowed(row, col) then
+                if row and show_arrows and warfare_relations.pair_allowed(row, col) then
                     -- Direction the pair has moved today, greyed once its daily allowance is gone.
                     local moved = warfare_relations.moved_today(row, col)
                     if moved ~= 0 then
                         local _, _, _, room = warfare_relations.preview(row, col, cfg)
-                        arrow:InitTexture(moved > 0 and [[ui\ui_warfare_arrow_up]]
+                        a:InitTexture(moved > 0 and [[ui\ui_warfare_arrow_up]]
                             or [[ui\ui_warfare_arrow_down]])
-                        arrow:SetTextureColor((room == 0 and CLR_BLOCKED)
+                        a:SetTextureColor((room == 0 and CLR_BLOCKED)
                             or (moved > 0 and CLR_UP) or CLR_DOWN)
-                        arrow:Show(true)
+                        a:Show(true)
                     end
                 end
             end
@@ -252,28 +301,31 @@ local function fill(self)
 end
 
 --- Indexed off a real cell's rect rather than the tab's, so nothing is assumed about how the engine
---- placed the grid: the cells are COL_W and ROW_H apart in whatever space that rect is in.
+--- placed the grid: the cells are one pitch apart in whatever space that rect is in.
 local function cell_at(self, pos)
-    local cols = #self.wf_list
-    local origin = self.wf_value[0] and self.wf_value[0][1]
-    if cols == 0 or not origin then
+    local wf = self.wf
+    local cols = #wf.list
+    if cols == 0 or not wf.origin or wf.dx <= 0 or wf.dy <= 0 then
         return nil
     end
     local rect = Frect():set(0, 0, 0, 0)
-    origin:GetAbsoluteRect(rect)
+    wf.origin:GetAbsoluteRect(rect)
     local x = pos.x - rect.x1
     local y = pos.y - rect.y1
-    if x < 0 or y < 0 or x >= cols * COL_W or y >= (cols + 1) * ROW_H then
+    if x < 0 or y < 0 or x >= cols * wf.dx or y >= (wf.rows + 1) * wf.dy then
         return nil
     end
-    return math.floor(y / ROW_H), math.floor(x / COL_W) + 1
+    local k = math.floor(y / wf.dy)
+    if wf.row(k) == false then
+        return nil
+    end
+    return k, math.floor(x / wf.dx) + 1
 end
 
 --- The headers are faction logos and the badge is a bare arrow, so everything else is here.
 local function hint_text(self, k, i)
-    local list = self.wf_list
-    local col = list[i]
-    local row = list[k]
+    local col = self.wf.list[i]
+    local row = self.wf.row(k)
 
     if not row then
         return clr_w .. game.translate_string(col) .. "\\n"
@@ -326,21 +378,35 @@ function on_game_start()
         return
     end
     cls.__warfare_matrix = true
-    warfare_log.debug("ui_pda_relations_warfare.on_game_start: patching the relations matrix")
+
+    local ctor = ui_pda_relations_warfare_safr.owns(cls) and ui_pda_relations_warfare_safr or own
+    warfare_log.debug("ui_pda_relations_warfare.on_game_start: patching the relations matrix (%s)",
+        ctor.name)
 
     local original_init = cls.InitControls
     cls.InitControls = function(self, ...)
-        self.wf_list = roster()
-        self.list = {}
+        ctor.prepare(self)
         local res = original_init(self, ...)
-        build(self)
+
+        local xml = CScriptXmlInit()
+        xml:ParseFile(TEMPLATES)
+        self.wf = ctor.build(self, xml)
+        if self.wf then
+            -- Its own hint, not the tab's: vanilla ends every Update with a bare hint_wnd:Update(),
+            -- and UIHint:Pass treats that as "no text" and rearms its delay timer. Anything written
+            -- to that window afterwards is inside the fresh delay window and is refused, every
+            -- frame, forever.
+            self.wf_hint = utils_ui.UIHint(self)
+            warfare_log.debug("ui_pda_relations_warfare.build: %s grid, %s columns, %s rows",
+                ctor.name, #self.wf.list, self.wf.rows + 1)
+        end
         return res
     end
 
     local original_reset = cls.Reset
     cls.Reset = function(self, ...)
         local res = original_reset(self, ...)
-        if self.wf_value then
+        if self.wf then
             fill(self)
         end
         return res
@@ -349,7 +415,7 @@ function on_game_start()
     local original_update = cls.Update
     cls.Update = function(self, ...)
         local res = original_update(self, ...)
-        if not self.wf_value then
+        if not self.wf then
             return res
         end
 
@@ -365,7 +431,7 @@ function on_game_start()
 
         -- mouse_over_id means vanilla already claimed a hint for a companion portrait.
         local k, i
-        if not self.mouse_over_id then
+        if not self.mouse_over_id and self.wf.arrows_on() then
             k, i = cell_at(self, GetCursorPosition())
         end
         if k then

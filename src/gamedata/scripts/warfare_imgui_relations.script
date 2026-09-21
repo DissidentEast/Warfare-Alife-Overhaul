@@ -79,8 +79,8 @@ end
 function render()
     local o = warfare_options.options
 
-    if not ui_options.get("alife/general/dynamic_relations") then
-        ImGui.Text("Dynamic relations is off - nothing feeds relation changes.")
+    if not warfare_relations.enabled() then
+        ImGui.Text("Relation pacing is off (warfare switch or alife/general/dynamic_relations) - nothing feeds relation changes.")
         return
     end
 

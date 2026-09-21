@@ -453,7 +453,7 @@ end
 
 local game_relations_calculate_relation_change = game_relations.calculate_relation_change
 function game_relations.calculate_relation_change(victim_tbl, killer_tbl)
-    if not _G.WARFARE then
+    if not warfare_relations.enabled() then
         return game_relations_calculate_relation_change(victim_tbl, killer_tbl)
     end
     return warfare_relations.contribute(victim_tbl, killer_tbl)

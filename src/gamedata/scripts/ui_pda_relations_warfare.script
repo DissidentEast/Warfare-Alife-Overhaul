@@ -19,6 +19,9 @@
 --- control on the tab is still built and driven by vanilla code. ui_pda_relations_warfare_safr
 --- overlays SAFR's matrix instead when that mod owns the tab class.
 ---
+--- With the relation_pacing option off nothing of the pacing layer shows: no arrows, hint or
+--- status line, and no SAFR overlay at all. Warfare's own matrix still replaces vanilla's.
+---
 --- All three overrides chain to the original: modxml_portrait_cover also wraps Reset.
 
 local TEMPLATES = "ui_warfare_relations.xml"
@@ -54,8 +57,8 @@ local CLR_BLOCKED = GetARGB(255, 125, 125, 125)
 local clr_w = utils_xml.get_color("white")
 local clr_gr = utils_xml.get_color("ui_gray_1")
 
-local function pacing_on()
-    return (_G.WARFARE and ui_options.get("alife/general/dynamic_relations")) and true or false
+local function switch_on()
+    return warfare_options.options.relation_pacing and true or false
 end
 
 local function signed(n)
@@ -197,12 +200,13 @@ local function goodwill_string(v)
 end
 
 local function fill_status(wf, paced, cfg)
-    if not wf.status_on() then
+    if not (wf.status_on() and switch_on()) then
         wf.status_left:SetText("")
         wf.status_right:SetText("")
         return
     end
 
+    -- Warfare would pace, but the vanilla master switch is off.
     if not paced then
         wf.status_left:SetText(game.translate_string("st_wrfr_rel_static"))
         wf.status_right:SetText("")
@@ -253,7 +257,7 @@ end
 local function fill(self)
     local wf = self.wf
     local list = wf.list
-    local paced = pacing_on()
+    local paced = warfare_relations.enabled()
     local cfg = paced and warfare_relations.settings() or nil
     local show_arrows = paced and wf.arrows_on()
 
@@ -377,6 +381,12 @@ function on_game_start()
         ctor.prepare(self)
         local res = original_init(self, ...)
 
+        -- The SAFR overlay is nothing but pacing decoration and SAFR rebuilds its tab on every
+        -- open; warfare's own grid is the matrix itself and is built once, so it is always built
+        -- and its pacing parts stay hidden until the switch is on.
+        if ctor ~= own and not switch_on() then
+            return res
+        end
         local xml = CScriptXmlInit()
         xml:ParseFile(TEMPLATES)
         self.wf = ctor.build(self, xml)
@@ -420,7 +430,7 @@ function on_game_start()
 
         -- mouse_over_id means vanilla already claimed a hint for a companion portrait.
         local k, i
-        if not self.mouse_over_id and self.wf.arrows_on() then
+        if not self.mouse_over_id and switch_on() and self.wf.arrows_on() then
             k, i = cell_at(self, GetCursorPosition())
         end
         if k then

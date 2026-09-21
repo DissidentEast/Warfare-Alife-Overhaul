@@ -212,7 +212,8 @@ function ui_options.init_opt_coder()
                 { id = "use_old_auto_capture", type = "check", val = 1, def = false },
                 { id = "prevent_mainbase_attacks", type = "check", val = 1, def = true },
             } },
-            { id = "relations", featured = { "relation_daily_budget" }, rows = {
+            { id = "relations", featured = { "relation_pacing", "relation_daily_budget" }, rows = {
+                { id = "relation_pacing", type = "check", val = 1, def = true },
                 { id = "relation_daily_budget", type = "track", val = 2, def = 250, min = 0, max = 2000, step = 50 },
                 { id = "relation_all_pairs", type = "check", val = 1, def = true },
                 { id = "relation_step", type = "track", val = 2, def = 25, min = 0, max = 200, step = 5 },

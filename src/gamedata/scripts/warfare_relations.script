@@ -15,8 +15,8 @@
 --- story mode stiffens the pull. Reachability is anchor +/- cap, which is what decides whether a
 --- given pair can ever ally: nothing prohibits it explicitly.
 ---
---- Inert unless _G.WARFARE and alife/general/dynamic_relations are on - the latter is checked by
---- the game_relations death callbacks upstream of contribute().
+--- Inert unless enabled(): every inlet and the tick check it, so with the relation_pacing option
+--- off another mod may drive faction relations and warfare neither contributes nor commits.
 
 local SAFE = 4750               -- stay inside +/-friend_limit: change_faction_relations resets a pegged pair to 0 on a coin flip
 local SEC_PER_DAY = 86400
@@ -61,6 +61,13 @@ local lore                      -- [pair_key] = shipped relation value
 local allowed_pairs             -- { { a, b, key }, ... } for pairs relation changes may touch
 local allowed_pairs_mode        -- relation_all_pairs as of the last build of allowed_pairs
 local political                 -- { [faction] = true } for the playable faction roster
+
+--- Whether warfare paces relations at all: its own switch plus the vanilla master switch that the
+--- game_relations death callbacks already honour.
+function enabled()
+    return (_G.WARFARE and warfare_options.options.relation_pacing
+        and ui_options.get("alife/general/dynamic_relations")) and true or false
+end
 
 function pair_key(a, b)
     if a < b then

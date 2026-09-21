@@ -768,7 +768,9 @@ function actor_on_update()
             was_night_wt = new_is_night
         end
 
-        warfare_relations.tick(time_delta)
+        if warfare_relations.enabled() then
+            warfare_relations.tick(time_delta)
+        end
     end
 
     last_update = warfare_utils.add_time(tg, 60)

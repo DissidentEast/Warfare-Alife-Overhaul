@@ -1831,8 +1831,7 @@ end
 -- of the lost smart.
 function faction_diplomatic_penalty(contested_smart_id, faction_1, faction_2)
 
-    -- only allowed when dynamic relations is on
-    if (not (ui_options.get("alife/general/dynamic_relations"))) then
+    if not warfare_relations.enabled() then
         return
     end
 

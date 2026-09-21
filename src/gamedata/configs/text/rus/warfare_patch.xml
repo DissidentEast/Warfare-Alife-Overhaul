@@ -661,7 +661,13 @@
 	<string id="ui_mm_alife_warfare_sec_relations">
 		<text>Отношения группировок</text>
 	</string>
-	<string id="ui_mm_alife_warfare_general_relation_daily_budget">
+		<string id="ui_mm_alife_warfare_general_relation_pacing">
+		<text>Warfare управляет отношениями группировок</text>
+	</string>
+	<string id="ui_mm_alife_warfare_general_relation_pacing_desc">
+		<text>Warfare сам ведёт отношения между группировками: учитывает убитых, захваченные базы и выполненные задания, а итог применяет порциями, не быстрее дневного лимита. На вкладке отношений в КПК видно, кто с кем сближается или ссорится, и сколько осталось до следующего пересчёта.\nЕсли за отношения отвечает другой мод — отключите. Тогда настройки ниже ни на что не влияют, убийства меняют отношения по-старому, а вкладка показывает просто цифры.</text>
+	</string>
+<string id="ui_mm_alife_warfare_general_relation_daily_budget">
 		<text>Предел изменений за сутки</text>
 	</string>
 	<string id="ui_mm_alife_warfare_general_relation_daily_budget_desc">

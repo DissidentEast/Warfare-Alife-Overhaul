@@ -58,10 +58,6 @@ local TASK_EFFECTS = {
     "inc_goodwill_by_tasker_id", "dec_goodwill_by_tasker_id",
 }
 
-local function split_enabled()
-    return _G.WARFARE and ui_options.get("alife/general/dynamic_relations")
-end
-
 local function splitter(original)
     return function(community, id, delta)
         delta = tonumber(delta) or 0
@@ -83,7 +79,7 @@ local function wrap_task_effect(name)
         return false
     end
     xr_effects[name] = function(...)
-        if not split_enabled() then
+        if not warfare_relations.enabled() then
             return effect(...)
         end
         local original = game_relations.change_factions_community_num

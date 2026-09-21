@@ -1,12 +1,10 @@
 ## What's Changed
 
 ### Features
-- Squads that merely cross paths now skirmish instead of fighting to the death: the fight ends at the first death, both squads move on, and the squad that lost a man avoids skirmishes for three in-game hours. Deliberate hunts and assaults still fight in full
-- Whether a chance meeting turns into a skirmish uses the average of both factions' hunt chance
-- Balanced preset retuned: patrols rest longer, random patrols stay out longer, Monolith runs random patrols, Renegades are slightly weaker
-
-### Improvements
-- Reworked how Warfare shows squads on the map so it no longer conflicts with other PDA addons
+- Faction relations have an on/off switch in the Faction Relations settings: with it off Warfare stops moving faction standings and removes its arrows, hover breakdown and daily-limit footer from the PDA Relations tab, so another addon can manage relations
+- Show All Faction Relations in PDA support: Warfare adds its arrows and footer to that addon's grid instead of drawing its own matrix over it
+- Added an All Out War preset
 
 ### Bug Fixes
-- Fix the settings page jumping to the top when a section is toggled
+- Fix all-out war resetting every faction to -2000 on every load instead of once per game
+- Fix the important documents dialog breaking with traders outside the eight main factions, such as the Barman

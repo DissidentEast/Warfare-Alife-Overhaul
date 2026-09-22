@@ -84,7 +84,6 @@ If using debug mode, may cause some issues with selecting the Warfare mapspot. U
 Contains all patches for Gamma modpack compatibility.
 
 If you select this, select also these mods:
-ZCP
 LTTZ
                             </description>
                             <files>
@@ -100,21 +99,6 @@ LTTZ
                 <group name="Patches" type="SelectAny">
                     <!--<designer.metadata.do.not.edit> {"name":"Patches"}-->
                     <plugins order="Explicit">
-                        <plugin name="ZCP">
-                            <!--<designer.metadata.do.not.edit> {"name":"'Dynamic' addons"}-->
-                            <description>
-Compatibility with ZCP (needed for Gamma).
-
-Prevents it from adjusting size and extra spawning.
-                            </description>
-                            <files>
-                                <folder source="patches\ZCP"
-                                        destination="" priority="0" alwaysInstall="false" installIfUsable="false"/>
-                            </files>
-                            <typeDescriptor>
-                                <type name="Optional"/>
-                            </typeDescriptor>
-                        </plugin>
                         <plugin name="LTTZ">
                             <!--<designer.metadata.do.not.edit> {"name":"'Dynamic' addons"}-->
                             <description>

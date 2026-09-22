@@ -1,0 +1,127 @@
+-- Zone Customization Project (ZCP) compatibility. Inert unless ZCP is installed; supports ZCP 1.4
+-- (GAMMA "Balanced Spawns") and 1.5. Each hook is installed only when the function it wraps exists,
+-- and every ZCP hook passes through to the original outside warfare games.
+
+-- ZCP 1.4 keeps its own check local; this mirrors it against the public enabled-prefix list.
+local function type_enabled_14(section)
+    for _, prefix in pairs(smr_pop.get_mutant_spawn_table()) do
+        if string.sub(section, 1, string.len(prefix)) == prefix then
+            return true
+        end
+    end
+    return false
+end
+
+local function members(squad)
+    local sim = alife()
+    local list = {}
+    for k in squad:squad_members() do
+        local se_obj = k.object or k.id and sim:object(k.id)
+        if se_obj then
+            list[#list + 1] = se_obj
+        end
+    end
+    return list
+end
+
+-- Squad size is warfare's to decide: both versions' size multipliers are off in warfare games.
+local function patch_squad_size()
+    if smr_pop.adjust_squad_size then
+        local orig = smr_pop.adjust_squad_size
+        smr_pop.adjust_squad_size = function(squad, smart)
+            if IsWarfare() then
+                return
+            end
+            return orig(squad, smart)
+        end
+    end
+    if smr_squad and smr_squad.adjust_random_count then
+        local orig = smr_squad.adjust_random_count
+        smr_squad.adjust_random_count = function(squad, c)
+            if IsWarfare() then
+                return c
+            end
+            return orig(squad, c)
+        end
+    end
+end
+
+-- ZCP 1.4 post-processes every new squad and may release it or spawn a replacement squad. In
+-- warfare games only members are removed or swapped; the squad itself is never released.
+local function patch_member_filters_14()
+    if smr_pop.remove_disabled_mutants_from_squad then
+        local orig = smr_pop.remove_disabled_mutants_from_squad
+        smr_pop.remove_disabled_mutants_from_squad = function(squad, spawn_smart)
+            if not IsWarfare() then
+                return orig(squad, spawn_smart)
+            end
+            if not smr_amain_mcm.get_config("smr_enabled") then
+                return
+            end
+            for _, se_obj in ipairs(members(squad)) do
+                if IsMonster(nil, se_obj:clsid())
+                    and (not get_object_story_id(se_obj.id))
+                    and (not type_enabled_14(se_obj:section_name()))
+                then
+                    alife_release(se_obj)
+                end
+            end
+        end
+    end
+
+    if smr_pop.replace_mutant_variants_in_squad then
+        local orig = smr_pop.replace_mutant_variants_in_squad
+        smr_pop.replace_mutant_variants_in_squad = function(squad, smart)
+            if not IsWarfare() then
+                return orig(squad, smart)
+            end
+            local variants = smr_pop.get_unused_mutant_spawn_table()
+            local chance = smr_mutants_mcm.get_config("unused_types_chance")
+            for _, se_obj in ipairs(members(squad)) do
+                local pool = variants[str_explode(se_obj:section_name(), "_")[1]]
+                if pool and (math.random(1, 100) <= chance) then
+                    local replacement = alife_create(pool[math.random(#pool)], smart)
+                    if replacement then
+                        squad:register_member(replacement.id)
+                        alife_release(se_obj)
+                    end
+                end
+            end
+        end
+    end
+end
+
+-- Spawn filters can leave a warfare squad without members; such a squad would never register and
+-- would hold a slot in the per-level mutant cap. Dropped here, so warfare sees nil.
+local function checked_squad(squad, section)
+    if not squad then
+        return nil
+    end
+    if not alife_object(squad.id) then
+        warfare_log.warn("zcp: dropped released squad section=%s id=%s", section, squad.id)
+        return nil
+    end
+    if squad:npc_count() == 0 then
+        warfare_log.info("zcp: dropped empty squad section=%s id=%s", section, squad.id)
+        alife_release_id(squad.id)
+        return nil
+    end
+    return squad
+end
+
+local function patch_warfare_create()
+    local orig = warfare.create_squad
+    warfare.create_squad = function(section, smart)
+        return checked_squad(orig(section, smart), section)
+    end
+end
+
+function on_game_start()
+    if not smr_pop then
+        return
+    end
+    warfare_log.info("zcp: ZCP detected, installing compatibility hooks")
+    patch_squad_size()
+    patch_member_filters_14()
+    patch_warfare_create()
+end

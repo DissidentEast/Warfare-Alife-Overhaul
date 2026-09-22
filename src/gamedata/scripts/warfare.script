@@ -186,16 +186,20 @@ function is_owned(squad)
     return tbl ~= nil and tbl[squad.id] ~= nil
 end
 
+-- Creation step of spawn_squad, a separate entry so compatibility patches can wrap it.
+-- smart is a smart object or its name. May return nil.
+function create_squad(section, smart)
+    if type(smart) == "string" then
+        return utils_obj.create_squad(section, smart)
+    end
+    return SIMBOARD:create_squad(smart, section)
+end
+
 -- The only way warfare creates squads. smart is a smart object or its name;
 -- kind is nil for a faction squad or "service" (see spawning_own).
 function spawn_squad(section, smart, kind)
-    local squad
     spawning_own = kind or true
-    if type(smart) == "string" then
-        squad = utils_obj.create_squad(section, smart)
-    else
-        squad = SIMBOARD:create_squad(smart, section)
-    end
+    local squad = create_squad(section, smart)
     spawning_own = false
     return squad
 end
@@ -1056,6 +1060,7 @@ function fill_start_position()
 
                     if (warfare_options.options.factions[sf].spawn_on_new_game) then
                         for i = 1, count do
+                            local squad
                             local squad_spawned = false
                             if smart and (common or string.find(squad_section, "sim_squad_")) and (not is_squad_monster[faction]) and (smart_current_pop < round_idp(math.max(1, smart.max_population * stalker_pop_factor))) then
                                 squad = spawn_squad(squad_section, smart)                -- common squads can't go over user-set cap
@@ -1066,7 +1071,11 @@ function fill_start_position()
                                 squad_spawned = true
                             end
 
-                            if smart and squad_spawned and registered_squads[squad:get_squad_community()] and owns_section(squad_section, true) then
+                            -- Spawn filters from other mods can leave nothing to create.
+                            if squad_spawned and not squad then
+                                warfare_log.info("fill_start_position: no squad created section=%s smart=%s", squad_section, smart and smart:name())
+                            end
+                            if smart and squad and registered_squads[squad:get_squad_community()] and owns_section(squad_section, true) then
                                 sim_squad_warfare.set_target(squad, smart.id)
                                 warfare_log.info("fill_start_position: spawned squad section=%s faction=%s smart=%s", squad_section, sf, smart:name())
 

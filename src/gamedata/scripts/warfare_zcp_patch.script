@@ -1,6 +1,32 @@
 -- Zone Customization Project (ZCP) compatibility. Inert unless ZCP is installed; supports ZCP 1.4
 -- (GAMMA "Balanced Spawns") and 1.5. Each hook is installed only when the function it wraps exists,
 -- and every ZCP hook passes through to the original outside warfare games.
+--
+-- With the zcp_mutant_spawns option on, warfare's own mutant pick is handed to ZCP as the original
+-- spawn and ZCP keeps or replaces it (1:1, so warfare's caps still hold), and ZCP sizes those
+-- mutant squads. With it off, ZCP's species filter and variant swaps are skipped for squads
+-- warfare creates.
+
+local creating = false    -- a warfare squad is being created
+local routing = false     -- ZCP is choosing a warfare mutant squad
+
+local function zcp_drives_mutants()
+    return warfare_options.options.zcp_mutant_spawns and true or false
+end
+
+local function bypass_filters()
+    return creating and not zcp_drives_mutants()
+end
+
+local function is_mutant_section(section)
+    local faction = ini_sys:r_string_ex(section, "faction")
+    return faction and is_squad_monster[faction] or false
+end
+
+-- ZCP may size only the mutant squads warfare creates while the option is on.
+local function zcp_sizes_squad(squad)
+    return creating and zcp_drives_mutants() and is_mutant_section(squad:section_name())
+end
 
 -- ZCP 1.4 keeps its own check local; this mirrors it against the public enabled-prefix list.
 local function type_enabled_14(section)
@@ -24,12 +50,13 @@ local function members(squad)
     return list
 end
 
--- Squad size is warfare's to decide: both versions' size multipliers are off in warfare games.
+-- In warfare games ZCP's size multiplier applies only to warfare's mutant squads with the option on;
+-- stalker squad sizes stay warfare's. A 1.4 shrink can release a mutant squad; checked_squad drops it.
 local function patch_squad_size()
     if smr_pop.adjust_squad_size then
         local orig = smr_pop.adjust_squad_size
         smr_pop.adjust_squad_size = function(squad, smart)
-            if IsWarfare() then
+            if IsWarfare() and not zcp_sizes_squad(squad) then
                 return
             end
             return orig(squad, smart)
@@ -38,7 +65,7 @@ local function patch_squad_size()
     if smr_squad and smr_squad.adjust_random_count then
         local orig = smr_squad.adjust_random_count
         smr_squad.adjust_random_count = function(squad, c)
-            if IsWarfare() then
+            if IsWarfare() and not zcp_sizes_squad(squad) then
                 return c
             end
             return orig(squad, c)
@@ -55,7 +82,7 @@ local function patch_member_filters_14()
             if not IsWarfare() then
                 return orig(squad, spawn_smart)
             end
-            if not smr_amain_mcm.get_config("smr_enabled") then
+            if bypass_filters() or not smr_amain_mcm.get_config("smr_enabled") then
                 return
             end
             for _, se_obj in ipairs(members(squad)) do
@@ -75,6 +102,9 @@ local function patch_member_filters_14()
             if not IsWarfare() then
                 return orig(squad, smart)
             end
+            if bypass_filters() then
+                return
+            end
             local variants = smr_pop.get_unused_mutant_spawn_table()
             local chance = smr_mutants_mcm.get_config("unused_types_chance")
             for _, se_obj in ipairs(members(squad)) do
@@ -89,6 +119,75 @@ local function patch_member_filters_14()
             end
         end
     end
+end
+
+-- ZCP 1.5 filters and swaps members while the squad is being filled.
+local function patch_member_filters_15()
+    if not smr_squad then
+        return
+    end
+    if smr_squad.is_mutant_type_enabled then
+        local orig = smr_squad.is_mutant_type_enabled
+        smr_squad.is_mutant_type_enabled = function(section)
+            if bypass_filters() then
+                return true
+            end
+            return orig(section)
+        end
+    end
+    if smr_squad.replace_mutant_variant then
+        local orig = smr_squad.replace_mutant_variant
+        smr_squad.replace_mutant_variant = function(section)
+            if bypass_filters() then
+                return section
+            end
+            return orig(section)
+        end
+    end
+end
+
+-- smr_handle_spawn first rolls ZCP's zombie outbreak on any common squad, which can put a
+-- zombified faction squad on a mutant lair; that roll is off while ZCP picks for warfare.
+local function patch_zombie_roll()
+    if not (smr_zombies_mcm and smr_zombies_mcm.get_config) then
+        return
+    end
+    local orig = smr_zombies_mcm.get_config
+    smr_zombies_mcm.get_config = function(key)
+        if routing and key == "zombie_spawn" then
+            return false
+        end
+        return orig(key)
+    end
+end
+
+-- smr_handle_spawn is the one entry both ZCP versions share and the only way to reach 1.4's
+-- per-level tables. It creates the squad itself; nil means the caller creates warfare's pick.
+local function route_through_zcp(section, smart)
+    local se_smart = smart
+    if type(smart) == "string" then
+        se_smart = SIMBOARD.smarts_by_names[smart]
+    end
+    if not se_smart then
+        return nil
+    end
+
+    routing = true
+    local ok, squad = pcall(smr_pop.smr_handle_spawn, section, se_smart)
+    routing = false
+
+    if not ok then
+        warfare_log.err("zcp: smr_handle_spawn failed section=%s smart=%s: %s", section, se_smart:name(), squad)
+        return nil
+    end
+    if not squad then
+        return nil
+    end
+    if type(smart) == "string" then
+        squad.scripted_target = smart
+    end
+    warfare_log.debug("zcp: routed section=%s -> %s smart=%s", section, squad:section_name(), se_smart:name())
+    return squad
 end
 
 -- Spawn filters can leave a warfare squad without members; such a squad would never register and
@@ -112,7 +211,16 @@ end
 local function patch_warfare_create()
     local orig = warfare.create_squad
     warfare.create_squad = function(section, smart)
-        return checked_squad(orig(section, smart), section)
+        creating = true
+        local squad
+        if zcp_drives_mutants() and smr_pop.smr_handle_spawn and is_mutant_section(section) then
+            squad = route_through_zcp(section, smart)
+        end
+        if not squad then
+            squad = orig(section, smart)
+        end
+        creating = false
+        return checked_squad(squad, section)
     end
 end
 
@@ -123,5 +231,7 @@ function on_game_start()
     warfare_log.info("zcp: ZCP detected, installing compatibility hooks")
     patch_squad_size()
     patch_member_filters_14()
+    patch_member_filters_15()
+    patch_zombie_roll()
     patch_warfare_create()
 end

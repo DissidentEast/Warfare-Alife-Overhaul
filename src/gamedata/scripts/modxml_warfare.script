@@ -254,6 +254,7 @@ function ui_options.init_opt_coder()
                 { id = "monster_rare_chance_lab", type = "track", val = 2, def = 50, min = 0, max = 100, step = 1, fmt = "percent" },
                 { id = "monster_night_power_multiplier", type = "track", val = 2, def = 2.0, min = 1.0, max = 5.0, step = 0.1 },
                 { id = "enable_mutant_offline_combat", type = "check", val = 1, def = true },
+                { id = "zcp_mutant_spawns", type = "check", val = 1, def = true },
             } },
             { id = "combat", featured = { "offline_combat_distance" }, rows = {
                 { id = "offline_combat_distance", type = "track", val = 2, def = 50, min = 1, max = 100, step = 1, fmt = "meters" },

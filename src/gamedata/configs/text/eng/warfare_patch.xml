@@ -90,6 +90,12 @@
 	<string id="ui_mm_alife_warfare_general_monster_night_power_multiplier_desc">
 		<text>Multiplier applied to mutant squad power during offline combat at night (22:00 - 06:00). Makes mutants harder to defeat in offline simulation during nighttime. Default: 2.0</text>
 	</string>
+	<string id="ui_mm_alife_warfare_general_zcp_mutant_spawns">
+		<text>Mutant spawns follow ZCP</text>
+	</string>
+	<string id="ui_mm_alife_warfare_general_zcp_mutant_spawns_desc">
+		<text>With Zone Customization Project installed, ZCP decides which mutants warfare spawns: its random-mutant chance, spawn templates or balanced tables, species and variant toggles, and mutant squad size. Warfare still decides where, when and how many.\nOff: warfare picks its own mutants and ZCP leaves them alone. No effect without ZCP.</text>
+	</string>
 	<string id="ui_mm_alife_warfare_general_prevent_mainbase_attacks">
 		<text>Protect Original Main Bases from Attack</text>
 	</string>

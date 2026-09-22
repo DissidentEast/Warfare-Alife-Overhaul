@@ -146,6 +146,7 @@ function update_settings()
     options.monster_rare_chance_north = ui_options.get("alife/warfare/general/monster_rare_chance_north")
     options.monster_rare_chance_lab = ui_options.get("alife/warfare/general/monster_rare_chance_lab")
     options.monster_night_power_multiplier = ui_options.get("alife/warfare/general/monster_night_power_multiplier")
+    options.zcp_mutant_spawns = ui_options.get("alife/warfare/general/zcp_mutant_spawns")
 
     options.overflow_override = ui_options.get("alife/warfare/general/overflow_overrides_manual_control")
     options.territory_diplo_penalty = ui_options.get("alife/warfare/general/territory_diplo_penalty")

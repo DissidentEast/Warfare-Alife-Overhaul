@@ -90,6 +90,12 @@
 	<string id="ui_mm_alife_warfare_general_monster_night_power_multiplier_desc">
 		<text>Множитель, применяемый к силе отряда мутантов в офлайн-бою ночью (22:00–06:00). Делает мутантов сложнее для победы в офлайн-симуляции в ночное время. Значение по умолчанию: 2.0</text>
 	</string>
+	<string id="ui_mm_alife_warfare_general_zcp_mutant_spawns">
+		<text>Мутанты по правилам ZCP</text>
+	</string>
+	<string id="ui_mm_alife_warfare_general_zcp_mutant_spawns_desc">
+		<text>Если установлен Zone Customization Project, каких мутантов выпускать в логова, решает ZCP: шанс случайных мутантов, шаблоны или сбалансированные таблицы, включённые виды, вариации и размер групп мутантов. Где, когда и сколько, по-прежнему определяет Warfare.\nЕсли выключить, Warfare сам подбирает мутантов, а ZCP их не трогает. Без ZCP ни на что не влияет.</text>
+	</string>
 	<string id="ui_mm_alife_warfare_general_prevent_mainbase_attacks">
 		<text>Предотвращение атак на главные базы</text>
 	</string>

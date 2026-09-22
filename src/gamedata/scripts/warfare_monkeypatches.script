@@ -555,8 +555,24 @@ function tasks_assault.evaluate_squads_smarts(task_id, var, squad, smart)
     return false
 end
 
-local sim_squad_scripted_create_npc = sim_squad_scripted.create_npc
-function sim_squad_scripted.create_npc(self, spawn_smart, pos, lvid, gvid)
+-- Hooks for compatibility patches (see warfare_zcp_patch): the section to create for one squad
+-- member (nil skips the member) and the number of random members to add.
+function squad_member_section(squad, section)
+    return section
+end
+
+function squad_random_count(squad, count)
+    return count
+end
+
+-- Warfare games only: per-faction squad sizes apply to warfare's own spawns and service squads
+-- (trader, mechanic, ...) get one NPC. Other games keep the installed create_npc.
+local sim_squad_scripted_create_npc = sim_squad_scripted.sim_squad_scripted.create_npc
+function sim_squad_scripted.sim_squad_scripted.create_npc(self, spawn_smart, pos, lvid, gvid)
+    if not IsWarfare() then
+        return sim_squad_scripted_create_npc(self, spawn_smart, pos, lvid, gvid)
+    end
+
     --utils_data.debug_write("sim_squad_scripted:create_npc")
     local settings_id = self:section_name()
     local spawn_sections = parse_names(ini_sys:r_string_ex(settings_id, "npc") or "")
@@ -621,7 +637,8 @@ function sim_squad_scripted.create_npc(self, spawn_smart, pos, lvid, gvid)
 
     local npcs_list = {}
     for ind = 1, #spawn_sections do
-        local id = self:add_squad_member(spawn_sections[ind], base_spawn_position, base_lvi, base_gvi, ind)
+        local section = squad_member_section(self, spawn_sections[ind])
+        local id = section and self:add_squad_member(section, base_spawn_position, base_lvi, base_gvi, ind)
         if (id) then
             npcs_list[#npcs_list + 1] = id
         end
@@ -660,12 +677,13 @@ function sim_squad_scripted.create_npc(self, spawn_smart, pos, lvid, gvid)
         -- check for random squad members for each faction here.
 
         local random_count = count[1] and count[2] and math.random(count[1], count[2]) or math.random(1, 2)
-        random_count = random_count - self:npc_count()
+        random_count = squad_random_count(self, random_count - self:npc_count())
 
         local random_id
         for i = 1, random_count do
             random_id = math.random(1, #random_spawn)
-            local id = self:add_squad_member(random_spawn[random_id], base_spawn_position, base_lvi, base_gvi)
+            local section = squad_member_section(self, random_spawn[random_id])
+            local id = section and self:add_squad_member(section, base_spawn_position, base_lvi, base_gvi)
             if (id) then
                 npcs_list[#npcs_list + 1] = id
             end

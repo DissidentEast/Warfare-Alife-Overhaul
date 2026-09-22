@@ -1,6 +1,6 @@
--- Zone Customization Project (ZCP) compatibility. Inert unless ZCP is installed; supports ZCP 1.4
--- (GAMMA "Balanced Spawns") and 1.5. Each hook is installed only when the function it wraps exists,
--- and every ZCP hook passes through to the original outside warfare games.
+-- Zone Customization Project (ZCP) compatibility. Inert unless ZCP is installed; supports ZCP 1.4 and 1.5.
+-- Each hook is installed only when the function it wraps exists, and every ZCP hook passes through
+-- to the original outside warfare games.
 --
 -- With the zcp_mutant_spawns option on, warfare's own mutant pick is handed to ZCP as the original
 -- spawn and ZCP keeps or replaces it (1:1, so warfare's caps still hold), and ZCP sizes those
@@ -146,6 +146,33 @@ local function patch_member_filters_15()
     end
 end
 
+-- In warfare games warfare's create_npc replaces ZCP 1.5's, so 1.5's member hooks run through
+-- warfare's create_npc hooks instead.
+local function patch_warfare_members_15()
+    if not (smr_squad and smr_squad.is_mutant_type_enabled and smr_squad.replace_mutant_variant) then
+        return
+    end
+    local orig_section = warfare_monkeypatches.squad_member_section
+    warfare_monkeypatches.squad_member_section = function(squad, section)
+        section = orig_section(squad, section)
+        if not section then
+            return nil
+        end
+        local faction = ini_sys:r_string_ex(squad:section_name(), "faction")
+        if faction and is_squad_monster[faction] and not smr_squad.is_mutant_type_enabled(section) then
+            return nil
+        end
+        return smr_squad.replace_mutant_variant(section)
+    end
+
+    if smr_squad.adjust_random_count then
+        local orig_count = warfare_monkeypatches.squad_random_count
+        warfare_monkeypatches.squad_random_count = function(squad, count)
+            return smr_squad.adjust_random_count(squad, orig_count(squad, count))
+        end
+    end
+end
+
 -- smr_handle_spawn first rolls ZCP's zombie outbreak on any common squad, which can put a
 -- zombified faction squad on a mutant lair; that roll is off while ZCP picks for warfare.
 local function patch_zombie_roll()
@@ -232,6 +259,7 @@ function on_game_start()
     patch_squad_size()
     patch_member_filters_14()
     patch_member_filters_15()
+    patch_warfare_members_15()
     patch_zombie_roll()
     patch_warfare_create()
 end

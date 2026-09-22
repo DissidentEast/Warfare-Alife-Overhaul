@@ -3425,7 +3425,10 @@ local function outguns(squad, other)
     local own = sim_offline_combat.calculate_squad_power(squad)
     local enemy = 0
     for enemy_id, _ in pairs(SIMBOARD.smarts[other.id].squads) do
-        enemy = enemy + sim_offline_combat.calculate_squad_power(enemy_id and alife_object(enemy_id))
+        local enemy_squad = resolve_roster_squad(other.id, enemy_id)
+        if (enemy_squad) then
+            enemy = enemy + sim_offline_combat.calculate_squad_power(enemy_squad)
+        end
     end
     return own and own > enemy and (own / enemy - 1) * 100 > math.random(1, 100)
 end
@@ -5494,15 +5497,17 @@ function find_random_patrol_target(smart, faction, sid)
                     end
 
                     if (other_faction ~= "none") and (is_factions_enemies(faction, other_faction)) and (sid) then                -- random patrols only attack hostile locations if they are much stronger than enemy presence
-                        local squad = sid and alife_object(sid)
+                        local squad = alife_object(sid)
                         local enemy_squads = SIMBOARD.smarts[other.id].squads
                         local enemy_power = 0
-                        local patrol_power = sim_offline_combat.calculate_squad_power(squad)
+                        local patrol_power = squad and sim_offline_combat.calculate_squad_power(squad)
                         for enemy_id,_ in pairs(enemy_squads) do
-                            local enemy_squad = enemy_id and alife_object(enemy_id)
-                            enemy_power = enemy_power + sim_offline_combat.calculate_squad_power(enemy_squad)
+                            local enemy_squad = resolve_roster_squad(other.id, enemy_id)
+                            if (enemy_squad) then
+                                enemy_power = enemy_power + sim_offline_combat.calculate_squad_power(enemy_squad)
+                            end
                         end
-                        local attack_chance = (patrol_power / enemy_power - 1) * 100
+                        local attack_chance = patrol_power and (patrol_power / enemy_power - 1) * 100
                         if (patrol_power) and (patrol_power > enemy_power) and (attack_chance > math.random(1,100)) then
                             priority = 2
                         else

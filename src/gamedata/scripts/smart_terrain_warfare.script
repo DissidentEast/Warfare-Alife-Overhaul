@@ -3744,14 +3744,16 @@ function spawn_mutants(smart)
                     -- get squad section name
                     local section = squad:section_name()
                     local new_squad = warfare.spawn_squad(section, smart:name())    -- create identical section
-                    warfare_log.info("spawn_mutants: spawned same-section section=%s smart=%s",
-                        tostring(section), smart:name())
-                    sim_squad_warfare.set_target(squad, smart.id)
-                    -- update squads_by_level so other smarts in the same cycle see accurate count
-                    if new_squad and sim_offline_combat.squads_by_level[current_level] then
-                        sim_offline_combat.squads_by_level[current_level][new_squad.id] = true
+                    warfare_log.info("spawn_mutants: spawned same-section section=%s smart=%s id=%s",
+                        tostring(section), smart:name(), new_squad and new_squad.id)
+                    if new_squad then
+                        sim_squad_warfare.set_target(new_squad, smart.id)
+                        -- update squads_by_level so other smarts in the same cycle see accurate count
+                        if sim_offline_combat.squads_by_level[current_level] then
+                            sim_offline_combat.squads_by_level[current_level][new_squad.id] = true
+                        end
+                        spawned = true
                     end
-                    spawned = true
                     break
                 end
             end

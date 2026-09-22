@@ -425,32 +425,39 @@ local main_base_data = {
 }
 
 -- Reverse index: faction -> { smart_name, ... } for resurrection anchors
--- Built once at load time from main_base_data. Never maintained manually.
+-- Built from main_base_data by rebuild_main_base_indices. Never maintained manually.
 local resurrect_by_faction = {}
-for smart_name, data in pairs(main_base_data) do
-    if data.resurrect then
-        local f = data.faction
-        if not resurrect_by_faction[f] then resurrect_by_faction[f] = {} end
-        resurrect_by_faction[f][#resurrect_by_faction[f] + 1] = smart_name
-        -- secondary factions that also use this smart as resurrection anchor
-        if data.resurrect_also then
-            for _, f2 in ipairs(data.resurrect_also) do
-                if not resurrect_by_faction[f2] then resurrect_by_faction[f2] = {} end
-                resurrect_by_faction[f2][#resurrect_by_faction[f2] + 1] = smart_name
-            end
-        end
-    end
-end
 
 -- Reverse index: faction -> { smart_name, ... } of all main bases (HQs).
 -- Used as the last-resort recall destination so a displaced squad always has
--- somewhere to head. Built once at load time from main_base_data.
+-- somewhere to head. Built from main_base_data by rebuild_main_base_indices.
 local main_base_by_faction = {}
-for smart_name, data in pairs(main_base_data) do
-    local f = data.faction
-    if not main_base_by_faction[f] then main_base_by_faction[f] = {} end
-    main_base_by_faction[f][#main_base_by_faction[f] + 1] = smart_name
+
+local function rebuild_main_base_indices()
+    for f in pairs(resurrect_by_faction) do
+        resurrect_by_faction[f] = nil
+    end
+    for f in pairs(main_base_by_faction) do
+        main_base_by_faction[f] = nil
+    end
+    for smart_name, data in pairs(main_base_data) do
+        local f = data.faction
+        if data.resurrect then
+            if not resurrect_by_faction[f] then resurrect_by_faction[f] = {} end
+            resurrect_by_faction[f][#resurrect_by_faction[f] + 1] = smart_name
+            -- secondary factions that also use this smart as resurrection anchor
+            if data.resurrect_also then
+                for _, f2 in ipairs(data.resurrect_also) do
+                    if not resurrect_by_faction[f2] then resurrect_by_faction[f2] = {} end
+                    resurrect_by_faction[f2][#resurrect_by_faction[f2] + 1] = smart_name
+                end
+            end
+        end
+        if not main_base_by_faction[f] then main_base_by_faction[f] = {} end
+        main_base_by_faction[f][#main_base_by_faction[f] + 1] = smart_name
+    end
 end
+rebuild_main_base_indices()
 
 -- Locations are prioritized over regular bases when ecolog/loner are looking for bases.
 local travel_hubs = {
@@ -6022,6 +6029,13 @@ end
 
 function get_main_bases(faction)
     return main_base_by_faction[faction]
+end
+
+-- For compatibility patches: entry has the main_base_data shape; nil removes the smart.
+-- Must run before the first warfare update (on_game_start).
+function set_main_base(smart_name, entry)
+    main_base_data[smart_name] = entry
+    rebuild_main_base_indices()
 end
 
 ------------------------------------------------------------

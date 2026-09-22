@@ -224,6 +224,10 @@ function find_candidates(smart, faction, eligible, opts)
             goto continue
         end
 
+        if (smart_terrain_warfare.is_quest_locked(other, faction)) then
+            goto continue
+        end
+
         if (warfare_options.options.prevent_mainbase_attacks) then
             local protected_faction = smart_terrain_warfare.get_protected_base_faction(other:name())
             if (protected_faction) and (protected_faction ~= faction)

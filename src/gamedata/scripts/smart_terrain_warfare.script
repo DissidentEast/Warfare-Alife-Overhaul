@@ -558,11 +558,19 @@ local function level_name_for(level_id)
     return name or nil
 end
 
-local function smart_sim_available(smart)
-    if not (smart.sim_avail) then
-        return true
+-- A quest lock is a smart whose sim_avail condlist is currently false; story mode only. The verdict
+-- is vanilla's simulation_objects.available_by_id, evaluated directly until its loop reaches the smart.
+function is_smart_locked(smart)
+    local available = simulation_objects.available_by_id[smart.id]
+    if (available == nil) and (smart.sim_avail) then
+        available = xr_logic.pick_section_from_condlist(nil, smart, smart.sim_avail) == "true"
     end
-    return xr_logic.pick_section_from_condlist(nil, smart, smart.sim_avail) == "true"
+    return (available == false) and IsStoryMode()
+end
+
+-- A locked smart stays usable by the faction already holding it.
+function is_quest_locked(smart, faction)
+    return is_smart_locked(smart) and ((smart.owning_faction or "none") ~= faction)
 end
 
 local function count_mutant_lairs(li)
@@ -571,7 +579,7 @@ local function count_mutant_lairs(li)
         local smart = sid and alife_object(sid)
         local props = smart and smart.props
         if (props) and (props.lair > 0) and (props.base < 1) and (props.resource < 1) and (props.territory < 1)
-                and smart_sim_available(smart) then
+                and not is_smart_locked(smart) then
             count = count + 1
         end
     end
@@ -2035,7 +2043,9 @@ function process_targets(smart)
     -- Make sure all targets are still valid and count them if they are (can't use # operator on hash tables)
     for target,v in pairs(smart.target_smarts) do
         local other = alife_object(target)
-        if other and other.owning_faction and other.props and other.props.base > 0 then  -- only target bases
+        if other and is_quest_locked(other, smart.owning_faction) then
+            smart.target_smarts[target] = nil
+        elseif other and other.owning_faction and other.props and other.props.base > 0 then  -- only target bases
             -- Target is no longer valid
             if (other.owning_faction ~= "none" and not is_factions_enemies(smart.owning_faction, other.owning_faction)) and not warfare_behavior.displaceable_at_peace(other.owning_faction) then
                 smart.target_smarts[other.id] = nil
@@ -2068,7 +2078,8 @@ function process_targets(smart)
         local target = targetID and alife_object(targetID)
 
         -- Invasion target is no longer valid - replan during daytime
-        if not is_factions_enemies(smart.owning_faction, target.owning_faction) and not warfare_behavior.displaceable_at_peace(target.owning_faction) then
+        if (not is_factions_enemies(smart.owning_faction, target.owning_faction) and not warfare_behavior.displaceable_at_peace(target.owning_faction))
+            or is_quest_locked(target, smart.owning_faction) then
             invasions[smart.id] = nil    -- reset
             target = get_invasion_target(smart)
             if (target) then
@@ -3218,7 +3229,8 @@ function find_patrol_target(smart,patrol_table,squad)
 
         if (neighbor) and (neighbor.props)
         and ((neighbor.props.territory > 0 or neighbor.props.lair > 0) and neighbor.props.resource < 1 and neighbor.props.base < 1)
-        and (not patrol_table or patrol_table.target ~= neighbor_id) then
+        and (not patrol_table or patrol_table.target ~= neighbor_id)
+        and not is_quest_locked(neighbor, smart.owning_faction) then
             local dist = warfare.distance_to_xz_sqr(base_position, global_position.from(neighbor))
             candidates[#candidates + 1] = { neighbor, (dist > 1) and dist or 1 }
         end
@@ -3415,12 +3427,18 @@ local function scan_links(smart, visit)
     end
 end
 
--- First non-empty bucket wins; a random member of it becomes the squad's target.
+-- First bucket with an unlocked member wins; a random such member becomes the squad's target.
 local function pick(squad, ...)
+    local faction = squad:get_squad_community()
     for i = 1, select("#", ...) do
-        local bucket = select(i, ...)
-        if #bucket > 0 then
-            sim_squad_warfare.set_target(squad, bucket[math.random(#bucket)].id)
+        local open = {}
+        for _, other in ipairs(select(i, ...)) do
+            if not is_quest_locked(other, faction) then
+                open[#open + 1] = other
+            end
+        end
+        if #open > 0 then
+            sim_squad_warfare.set_target(squad, open[math.random(#open)].id)
             return true
         end
     end
@@ -3708,6 +3726,9 @@ function spawn_mutants(smart)
     if (smart.props.base > 0) or (smart.props.resource > 0) or (smart.props.territory > 0) or (smart.props.lair < 1) then
         return
     end
+    if is_smart_locked(smart) then
+        return
+    end
     warfare_log.trace("spawn_mutants: smart=%s", smart:name())
     if not (spawn_mutant_timers[smart.id]) then
         local min_respawn = warfare_options.options.monster_min_faction_respawn
@@ -3858,7 +3879,7 @@ function process_mutants(smart)
                                             isNight and ((other.props.lair > 0) or (other.props.territory > 0) or (other.props.resource > 0))
                                             or (other.props.lair > 0)
                                         )
-                                        if is_valid_type and ((other.owning_faction == "none") or ((other.owning_faction ~= "none") and (math.random(1, 20) > 19))) then    -- 1 in 20 chance of attacking a STALKER-occupied location
+                                        if is_valid_type and not is_quest_locked(other, "monster") and ((other.owning_faction == "none") or ((other.owning_faction ~= "none") and (math.random(1, 20) > 19))) then    -- 1 in 20 chance of attacking a STALKER-occupied location
                                             targets[#targets+1] = other                                                                                                    -- add possible locations to list of targets
                                         end
                                     end
@@ -3888,7 +3909,7 @@ function process_mutants(smart)
                                     isNight and ((other.props.lair > 0) or (other.props.territory > 0) or (other.props.resource > 0))
                                     or (other.props.lair > 0)
                                 )
-                                if is_valid_type and ((other.owning_faction == "none") or ((other.owning_faction ~= "none") and (math.random(1, 20) > 19))) then    -- 1 in 20 chance of attacking a STALKER-occupied location
+                                if is_valid_type and not is_quest_locked(other, "monster") and ((other.owning_faction == "none") or ((other.owning_faction ~= "none") and (math.random(1, 20) > 19))) then    -- 1 in 20 chance of attacking a STALKER-occupied location
                                     targets[#targets+1] = other                                                                                                    -- add possible locations to list of targets
                                 end
                             end
@@ -5560,6 +5581,10 @@ function find_random_patrol_target(smart, faction, sid)
             priority = -1000
         end
 
+        if is_quest_locked(other, faction) then
+            priority = -1000
+        end
+
         -- main base protection: never target or spawn on a base still held by its original faction
         local other_faction_rp = other.owning_faction or "none"
         if warfare_options.options.prevent_mainbase_attacks and other_faction_rp == get_protected_base_faction(other:name()) then
@@ -5691,6 +5716,10 @@ function find_targets(smart)
 
         -- storyline travel restrictions (Scorcher, Miracle Machine, underground, Monolith south)
         if not is_travel_allowed(level, other_level, faction) then
+            goto continue
+        end
+
+        if is_quest_locked(other, faction) then
             goto continue
         end
 

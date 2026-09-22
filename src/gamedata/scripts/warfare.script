@@ -936,7 +936,8 @@ function fill_start_position()
             smart.level_id = game_graph():vertex(smart.m_game_vertex_id):level_id()
         end
 
-        if (smart.props.lair > 0) and (smart.props.base < 1) and (smart.props.resource < 1) and (smart.props.territory < 1) then
+        if (smart.props.lair > 0) and (smart.props.base < 1) and (smart.props.resource < 1) and (smart.props.territory < 1)
+                and not smart_terrain_warfare.is_smart_locked(smart) then
             -- stagger mutant spawn timer so lairs don't all fire at the same time
             smart_terrain_warfare.spawn_mutant_next_update[smart.id] = math.random(0, mutant_max) * speed_mult
             smart_terrain_warfare.spawn_mutant_timers[smart.id] = get_time()
@@ -1236,7 +1237,7 @@ function initialize_random_starting_locations()
             max_resources = max_resources + smart.props.resource
         end
 
-        if (smart.props and smart.props.base > 0) then
+        if (smart.props and smart.props.base > 0) and not smart_terrain_warfare.is_smart_locked(smart) then
             bases[#bases + 1] = smart
         end
     end
@@ -1279,7 +1280,7 @@ function initialize_random_starting_locations()
                 local lvl = game_graph():vertex(s.m_game_vertex_id):level_id()
                 local off = level_targets.level_offsets[lvl]
 
-                if (off and s.props and s.props.base > 0) then
+                if (off and s.props and s.props.base > 0) and not smart_terrain_warfare.is_smart_locked(s) then
                     local gpos = global_position.from(s)
                     local safe = true
 
@@ -1309,7 +1310,7 @@ function initialize_random_starting_locations()
     end
 
     for name, smart in warfare_levels.supported_smarts() do
-        if (smart.props) then
+        if (smart.props) and not smart_terrain_warfare.is_smart_locked(smart) then
             if (smart.props.base > 0) then
                 if not (used_smarts[smart.id]) then
                     local f = {}

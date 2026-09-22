@@ -90,6 +90,109 @@ local tbl_smart = {}
 local old_state, new_state
 local opt_exclude, opt_dist = EXCLUDE_STORY_ID, COMBAT_DISTANCE
 
+-- Species relations: the per-species [monster_relations] table the engine uses online.
+local species_relations
+local species_matrix              -- [from][to] = -2..1, built once from the system ini
+local section_species = {}        -- [section] = species or false
+local squad_species = {}          -- [squad_id] = { n = npc_count, set = { [species] = true } }, cleared each coordinator tick
+
+local function get_species_matrix()
+    if species_matrix then
+        return species_matrix
+    end
+    species_matrix = {}
+    local columns = {}
+    local list = ini_sys:r_string_ex("monster_communities", "communities")
+    if list then
+        local parts = str_explode(list, ",")
+        for i = 1, #parts, 2 do
+            columns[#columns + 1] = parts[i]
+        end
+    end
+    local rows = 0
+    for _, from in ipairs(columns) do
+        local row = ini_sys:r_string_ex("monster_relations", from)
+        if row then
+            local values = str_explode(row, ",")
+            local rel = {}
+            for i, to in ipairs(columns) do
+                rel[to] = tonumber(values[i])
+            end
+            species_matrix[from] = rel
+            rows = rows + 1
+        end
+    end
+    local function show(a, b)
+        return species_matrix[a] and species_matrix[a][b]
+    end
+    warfare_log.debug("ocs: species matrix built columns=%s rows=%s human->zombie=%s zombie->human=%s human->dog=%s",
+        #columns, rows, show("human", "zombie"), show("zombie", "human"), show("human", "dog"))
+    return species_matrix
+end
+
+local function member_species(section)
+    local species = section_species[section]
+    if species == nil then
+        species = ini_sys:r_string_ex(section, "species") or false
+        section_species[section] = species
+    end
+    return species
+end
+
+local function get_squad_species(squad)
+    local n = squad:npc_count()
+    local cached = squad_species[squad.id]
+    if cached and cached.n == n then
+        return cached.set
+    end
+    local set = {}
+    local sim = alife()
+    for k in squad:squad_members() do
+        local se_obj = k.object or k.id and sim:object(k.id)
+        local species = se_obj and member_species(se_obj:section_name())
+        if species then
+            set[species] = true
+        end
+    end
+    squad_species[squad.id] = { n = n, set = set }
+    return set
+end
+
+-- true if any member species of one squad is hostile to any of the other's, in either direction;
+-- false if every checked pair is known and none is hostile; nil if no pair could be resolved.
+local function species_hostile(squad_1, squad_2)
+    local matrix = get_species_matrix()
+    local known = false
+    for a in pairs(get_squad_species(squad_1)) do
+        for b in pairs(get_squad_species(squad_2)) do
+            local ab = matrix[a] and matrix[a][b]
+            local ba = matrix[b] and matrix[b][a]
+            if (ab and ab < 0) or (ba and ba < 0) then
+                return true
+            end
+            if ab and ba then
+                known = true
+            end
+        end
+    end
+    if known then
+        return false
+    end
+    return nil
+end
+
+-- In warfare games mutant-vs-people pairs follow species relations, as they do online; everything
+-- else, and any pair the species table cannot resolve, follows community relations.
+local function pair_hostile(squad_1, community_1, squad_2, community_2)
+    if species_relations and ((community_1 == "monster") ~= (community_2 == "monster")) then
+        local hostile = species_hostile(squad_1, squad_2)
+        if hostile ~= nil then
+            return hostile
+        end
+    end
+    return is_enemy(community_1, community_2)
+end
+
 -- Mutants settings
 local m_rank_max, m_rank_factor = 27000, 0.2
 local m_class = {
@@ -541,6 +644,7 @@ local function coordinator()
         opt_dist = COMBAT_DISTANCE_WARFARE
         opt_exclude = EXCLUDE_STORY_ID_WARFARE
         can_fight_mutant = warfare_options.options.enable_mutant_offline_combat
+        species_relations = true
 
         for community, v in pairs(warfare_options.options.factions) do
             faction_power[community] = v.offline_power_multiplier
@@ -549,9 +653,11 @@ local function coordinator()
         opt_dist = COMBAT_DISTANCE
         opt_exclude = EXCLUDE_STORY_ID
         can_fight_mutant = true
+        species_relations = false
     end
 
     purge_expired_skirmishes()
+    empty_table(squad_species)
 
     warfare_log.debug("coordinator: tick done opt_dist=%s can_fight_mutant=%s pop_factor=%s", opt_dist, can_fight_mutant and "y" or "n", pop_factor)
 
@@ -726,7 +832,7 @@ function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1)
 
         -- Only simulate for enemies
         local community_2 = squad_2:get_squad_community()
-        if (community_2 ~= "monster" or can_fight_mutant) and is_enemy(community_1, community_2) then
+        if (community_2 ~= "monster" or can_fight_mutant) and pair_hostile(squad_1, community_1, squad_2, community_2) then
 
             -- Only simulate for close squads
             local d = distance_to_xz_sqr(squad_1.position, squad_2.position)

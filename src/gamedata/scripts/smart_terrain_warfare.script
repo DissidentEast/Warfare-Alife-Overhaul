@@ -66,9 +66,12 @@ end
 -- linked_smart_collection[level_id] = { smart_id1, smart_id2, ... } (current + linked levels)
 -- all_smart_collection = { smart_id1, smart_id2, ... } (all active levels)
 -- nonbase_smart_collection = { smart_id1, smart_id2, ... } (all active levels, bases excluded)
+-- base_smart_collection / linked_base_collection[level_id] = the same pools reduced to bases, same order
 local linked_smart_collection = {}
 local all_smart_collection = nil
 local nonbase_smart_collection = nil
+local base_smart_collection = nil
+local linked_base_collection = {}
 local smart_collections_built = false
 
 function build_smart_collections()
@@ -123,8 +126,25 @@ function build_smart_collections()
             nonbase_smart_collection[#nonbase_smart_collection + 1] = all_smart_collection[i]
         end
     end
-    warfare_log.info("build_smart_collections: built all=%s nonbase=%s levels=%s",
-        tostring(#all_smart_collection), tostring(#nonbase_smart_collection), tostring(table.getn(linked_smart_collection)))
+
+    -- Base-only pools (for find_targets)
+    local function bases_of(ids)
+        local out = {}
+        for i = 1, #ids do
+            local smart = alife_object(ids[i])
+            if smart and smart.props and smart.props.base >= 1 then
+                out[#out + 1] = ids[i]
+            end
+        end
+        return out
+    end
+    base_smart_collection = bases_of(all_smart_collection)
+    for lvl, collection in pairs(linked_smart_collection) do
+        linked_base_collection[lvl] = bases_of(collection)
+    end
+    warfare_log.info("build_smart_collections: built all=%s nonbase=%s base=%s levels=%s",
+        tostring(#all_smart_collection), tostring(#nonbase_smart_collection), tostring(#base_smart_collection),
+        tostring(table.getn(linked_smart_collection)))
 end
 
 
@@ -561,11 +581,14 @@ end
 -- A quest lock is a smart whose sim_avail condlist is currently false; story mode only. The verdict
 -- is vanilla's simulation_objects.available_by_id, evaluated directly until its loop reaches the smart.
 function is_smart_locked(smart)
+    if not IsStoryMode() then
+        return false
+    end
     local available = simulation_objects.available_by_id[smart.id]
     if (available == nil) and (smart.sim_avail) then
         available = xr_logic.pick_section_from_condlist(nil, smart, smart.sim_avail) == "true"
     end
-    return (available == false) and IsStoryMode()
+    return available == false
 end
 
 -- A locked smart stays usable by the faction already holding it.
@@ -2093,18 +2116,29 @@ function process_targets(smart)
 
     -- add new targets to the base if needed
     if ((pda_actor.manual_control and smart.owning_faction ~= warfare.actor_faction) or (not pda_actor.manual_control)) then
-        local targets = find_targets(smart)
+        local min_targets = invading_faction_props.min_smart_targets_per_base
+        local max_targets = invading_faction_props.max_smart_targets_per_base
+        -- At or above the minimum, at most one extra target is added per pass, on the aggression roll
+        -- below. Rolling it before the search skips find_targets whenever the cap or the roll would
+        -- reject every candidate anyway.
+        local extra_rolled = false
+        local search = target_smart_count < min_targets
+        if (not search) and (target_smart_count < max_targets) then
+            extra_rolled = math.random(100) <= (aggression / (target_smart_count - min_targets + 1))
+            search = extra_rolled
+        end
+        local targets = search and find_targets(smart) or {}
         if (#targets > 0) then
             for i=1,#targets do
                 if not (smart.target_smarts[targets[i][2]]) then
-                    local target_delta = target_smart_count - invading_faction_props.min_smart_targets_per_base
+                    local target_delta = target_smart_count - min_targets
                     local other = alife_object(targets[i][2])
                     local enemy_faction = other and other.owning_faction or "none"    -- hostile or empty
                     if (target_delta < 0) then
                         target_smart_count = target_smart_count + 1
                         smart.target_smarts[targets[i][2]] = true
                         ceasefire_check[targets[i][2]] = enemy_faction
-                    elseif (target_smart_count < invading_faction_props.max_smart_targets_per_base) and (math.random(100) <= (aggression / (target_delta + 1))) then
+                    elseif (target_smart_count < max_targets) and (extra_rolled or (math.random(100) <= (aggression / (target_delta + 1)))) then
                         -- after getting minimum amount of targets, add more targets based on aggression. Subsequent bases beyond the minimum are more difficult to add
                         target_smart_count = target_smart_count + 1
                         smart.target_smarts[targets[i][2]] = true
@@ -3960,21 +3994,60 @@ function fog_radius_sqr(involves_smart)
     return d * d
 end
 
+-- warfare_behavior.shares_intel(actor_faction, faction), memoised for the current frame
+-- (time_global() is constant within a frame).
+local intel_memo, intel_memo_t = {}, nil
+function actor_shares_intel(faction)
+    local t = time_global()
+    if t ~= intel_memo_t then
+        intel_memo, intel_memo_t = {}, t
+    end
+    local v = intel_memo[faction]
+    if v == nil then
+        v = warfare_behavior.shares_intel(warfare.actor_faction, faction)
+        intel_memo[faction] = v
+    end
+    return v
+end
+
+-- Smart server objects per level, resolved once from level_information. Rebuilt when
+-- level_information swaps in a new smarts table.
+local level_smart_objs = {}
+local level_smart_objs_src = {}
+local function smart_objs_on_level(lvl)
+    local info = warfare_levels.level_information[lvl]
+    local smarts = info and info.smarts
+    if not smarts then
+        return nil
+    end
+    if level_smart_objs_src[lvl] ~= smarts then
+        local objs = {}
+        for _, id in pairs(smarts) do
+            local smart = alife_object(id)
+            if smart then
+                objs[#objs + 1] = smart
+            end
+        end
+        level_smart_objs[lvl] = objs
+        level_smart_objs_src[lvl] = smarts
+    end
+    return level_smart_objs[lvl]
+end
+
 -- True when an owned outpost on level lvl has position within outpost fog range. Own outposts
 -- always count; allied ones only with include_allies and a shared intel link.
 function seen_by_outpost(lvl, position, include_allies)
-    local info = warfare_levels.level_information[lvl]
-    local smarts = info and info.smarts
+    local smarts = smart_objs_on_level(lvl)
     if not smarts then
         return false
     end
     local actor_faction = warfare.actor_faction
     local r = fog_radius_sqr(true)
-    for _, id in pairs(smarts) do
-        local smart = alife_object(id)
-        local owner = smart and smart.owning_faction
+    for i = 1, #smarts do
+        local smart = smarts[i]
+        local owner = smart.owning_faction
         if owner and owner ~= "none"
-        and (owner == actor_faction or (include_allies and warfare_behavior.shares_intel(actor_faction, owner)))
+        and (owner == actor_faction or (include_allies and actor_shares_intel(owner)))
         and warfare.distance_to_xz_sqr(smart.position, position) < r then
             return true
         end
@@ -4035,7 +4108,7 @@ function smart_terrain.se_smart_terrain:show()
 
                         if (squad and squad:clsid() == clsid.online_offline_group_s) then
                             -- a squad reveals what lies within fog range of it when its faction shares intel with the actor's
-                            if warfare_behavior.shares_intel(warfare.actor_faction, squad:get_squad_community()) then
+                            if actor_shares_intel(squad:get_squad_community()) then
                                 if (warfare.distance_to_xz_sqr(squad.position, self.position) < range_sqr) then
                                     visible = true
                                     break
@@ -4123,7 +4196,7 @@ function smart_terrain.se_smart_terrain:show()
                 end
 
                 -- an outpost reports itself at any distance when its faction shares intel with the actor's
-                if warfare_behavior.shares_intel(warfare.actor_faction, faction) then
+                if actor_shares_intel(faction) then
                     visible = true
                 end
 
@@ -5380,19 +5453,19 @@ local function is_scorcher_zone(lvl)
 end
 
 -- The zombied are immune for the same reason they are excluded from the registry: their movement is
--- a simulation property, not configurable behavior.
-local function is_scorcher_immune(faction)
-    return (warfare_behavior.scorcher_travel(faction) == "exempt") or (faction == "zombied")
+-- a simulation property, not configurable behavior. scorcher is the faction's scorcher_travel trait.
+local function is_scorcher_immune(faction, scorcher)
+    return (scorcher == "exempt") or (faction == "zombied")
 end
 
 -- Returns true if the Brain Scorcher blocks travel from source_level to target_level for faction.
 -- In story mode the scorcher is active until the player disables it; in freeplay it's always off.
-local function is_scorcher_blocked(source_level, target_level, faction)
+local function is_scorcher_blocked(source_level, target_level, faction, scorcher)
     if not IsStoryMode() or has_alife_info("bar_deactivate_radar_done") then
         return false
     end
 
-    if is_scorcher_immune(faction) then
+    if is_scorcher_immune(faction, scorcher) then
         return false
     end
 
@@ -5402,7 +5475,7 @@ local function is_scorcher_blocked(source_level, target_level, faction)
     end
 
     -- South <-> North blocked for non-immune factions, unless the divide is open to them (mercs)
-    if (warfare_behavior.scorcher_travel(faction) ~= "divide_open") and source_level then
+    if (scorcher ~= "divide_open") and source_level then
         if (is_south_level(source_level) and is_north_level(target_level)) or
            (is_north_level(source_level) and is_south_level(target_level)) then
             return true
@@ -5414,12 +5487,12 @@ end
 
 -- Returns true if the Miracle Machine blocks travel from source_level to target_level for faction.
 -- Blocks south (excl Dead City) <-> Dead City; mercs exempt (present in Dead City).
-local function is_miracle_machine_blocked(source_level, target_level, faction)
+local function is_miracle_machine_blocked(source_level, target_level, faction, scorcher)
     if not IsStoryMode() or has_alife_info("yan_labx16_switcher_primary_off") then
         return false
     end
 
-    if is_scorcher_immune(faction) or warfare_behavior.ignores_miracle_machine(faction) then
+    if is_scorcher_immune(faction, scorcher) or warfare_behavior.ignores_miracle_machine(faction) then
         return false
     end
 
@@ -5449,11 +5522,13 @@ function is_travel_allowed(source_level, target_level, faction)
     -- DEBUG: bypass all travel restrictions (scorcher, miracle machine, etc.)
     -- return true
 
-    if is_scorcher_blocked(source_level, target_level, faction) then
+    local scorcher = warfare_behavior.scorcher_travel(faction)
+
+    if is_scorcher_blocked(source_level, target_level, faction, scorcher) then
         return false
     end
 
-    if is_miracle_machine_blocked(source_level, target_level, faction) then
+    if is_miracle_machine_blocked(source_level, target_level, faction, scorcher) then
         return false
     end
 
@@ -5660,13 +5735,16 @@ function find_targets(smart)
         return {}
     end
 
-    -- Use precalculated smart collections (built once on load)
+    -- Use precalculated base collections (built once on load)
     local smartCollection
     if (warfare_options.options.factions[faction].linked_level_targeting) then
-        smartCollection = linked_smart_collection[level] or {}
+        smartCollection = linked_base_collection[level] or {}
     else
-        smartCollection = all_smart_collection or {}
+        smartCollection = base_smart_collection or {}
     end
+
+    -- per-call memo: the travel verdict depends only on the target level here
+    local travel_ok = {}
 
     local targets = {}
     local targets_n = 0
@@ -5715,16 +5793,16 @@ function find_targets(smart)
         -- Each of these originally set priority = -1000 which always fails the priority > 0 gate.
 
         -- storyline travel restrictions (Scorcher, Miracle Machine, underground, Monolith south)
-        if not is_travel_allowed(level, other_level, faction) then
+        local ok = travel_ok[other_level]
+        if ok == nil then
+            ok = is_travel_allowed(level, other_level, faction)
+            travel_ok[other_level] = ok
+        end
+        if not ok then
             goto continue
         end
 
-        if is_quest_locked(other, faction) then
-            goto continue
-        end
-
-        -- only bases can be taken over: lairs, bare resource points and territory are not targets
-        if other_props.base < 1 then
+        if is_story_mode and is_quest_locked(other, faction) then
             goto continue
         end
 

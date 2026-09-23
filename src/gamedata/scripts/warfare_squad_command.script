@@ -75,6 +75,10 @@ local function squad_label(squad)
     return squad.section_name and squad:section_name() or tostring(squad.id)
 end
 
+-- [squad_id] = overlay section | false: the ring this session last reconciled against the engine.
+-- Transient (never saved), so after a load every squad's first update_overlay checks the engine.
+local ring_known = {}
+
 -- Reconcile a squad's overlay ring with its current state, against the engine's ACTUAL spot
 -- state (not a tracked field, which desyncs across save/load). Only overlays squads that carry
 -- a base warfare spot (i.e. are shown on the map). Cosmetic only: every engine call is pcall-
@@ -103,6 +107,10 @@ function update_overlay(squad)
         end
     end
 
+    if (desired == nil) and (ring_known[id] == false) then
+        return
+    end
+
     for i = 1, #OVERLAY_SECTIONS do
         local sec = OVERLAY_SECTIONS[i]
         local has = spot_present(id, sec)
@@ -116,17 +124,22 @@ function update_overlay(squad)
             spot_remove(id, sec)
         end
     end
+    ring_known[id] = desired or false
 end
 
 -- Remove any overlay (used by hide / removal).
 function clear_overlay(squad)
     if not squad then return end
+    if ring_known[squad.id] == false then
+        return
+    end
     for i = 1, #OVERLAY_SECTIONS do
         local sec = OVERLAY_SECTIONS[i]
         if spot_present(squad.id, sec) then
             spot_remove(squad.id, sec)
         end
     end
+    ring_known[squad.id] = false
 end
 
 -- ---------------------------------------------------------------------------

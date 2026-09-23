@@ -759,4 +759,20 @@
 	<string id="st_warfare_presim_preparing">
 		<text>Preparing...</text>
 	</string>
+	<string id="st_mm_ck_story_desc">
+		<text>%c[ui_gray_2]Story mode allows the player to experience a unique set of story-driven and dynamic questlines.\n 
+		Note that story-driven questlines such as "Living Legend", "Mortal Sin" and "Operation Afterglow" are only available to Loner, Duty, Freedom, Ecologist, Mercenary and Clear Sky factions.\n
+		However, dynamic questlines can be enjoyed by all playable factions. In both cases, speak to your faction leader to begin. Have fun!\n \n
+		%c[ui_red]• %c[ui_gray_2]NOT compatible with Survival mode.\n
+		%c[ui_red]• %c[ui_gray_2]NOT compatible with Azazel mode.
+		</text>
+	</string>
+	<string id="st_mm_ck_warfare_desc">
+		<text>%c[ui_gray_2]Grants stalker's A-Life system more freedom, creating a more dynamic Zone.\n
+		Faction ownership of bases and territories is more prone to change. Medics, traders and mechanics are now also replaceable.\n
+		You have the ability to lead your faction and help them with taking over the surrounding areas, achieving dominance in the Zone.\n \n
+		%c[pda_white]• %c[ui_gray_2]Command your faction through the PDA map.\n
+		%c[ui_red]• %c[ui_gray_2]NOT compatible with Survival mode.
+		</text>
+	</string>
 </string_table>

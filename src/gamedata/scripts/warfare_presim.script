@@ -133,7 +133,7 @@ local function update_overlay()
         ov.progress:SetText(string.format(game.translate_string("st_warfare_presim_progress"), day, days, clock_text()))
     end
     if run.steps >= ETA_MIN_STEPS and run.elapsed < run.target then
-        local avg_ms = (time_global() - run.t0) / run.steps
+        local avg_ms = (warfare.get_realtime() - run.t0) / run.steps
         local steps_left = math.ceil((run.target - run.elapsed) / run.step)
         local min_left = math.max(1, math.ceil(steps_left * avg_ms / 60000))
         ov.eta:SetText(string.format(game.translate_string("st_warfare_presim_eta"), min_left))
@@ -226,7 +226,7 @@ local function restore_sound()
 end
 
 local function hold_actor()
-    bind_stalker_ext.invulnerable_time = time_global() + INVULNERABLE_MS
+    bind_stalker_ext.invulnerable_time = warfare.get_realtime() + INVULNERABLE_MS
     if run.actor then
         db.actor.satiety = run.actor.satiety
         db.actor.power = run.actor.power
@@ -265,7 +265,7 @@ local function finish(reason)
         apply_alife_params(r.alife)
     end
     unhook_needs()
-    bind_stalker_ext.invulnerable_time = time_global() + ARRIVAL_GRACE_MS
+    bind_stalker_ext.invulnerable_time = warfare.get_realtime() + ARRIVAL_GRACE_MS
     restore_sound()
     hide_overlay()
     if npe_director and npe_director.Unregister_dialog then
@@ -279,11 +279,11 @@ local function finish(reason)
         warfare_log.info("warfare_presim: ended before the run started (%s)", reason)
         return
     end
-    local total_ms = time_global() - r.t0
+    local total_ms = warfare.get_realtime() - r.t0
     local avg = r.steps > 0 and math.floor(total_ms / r.steps) or 0
     warfare_log.info("warfare_presim: done (%s) | simulated %s of %s game-min | %s steps | %s ms real | avg %s ms/step | min %s | max %s | game time %s",
         reason, r.elapsed - r.start_elapsed, r.target - r.start_elapsed, r.steps, total_ms, avg,
-        r.min_ms or 0, r.max_ms or 0, game.get_game_time():timeToString(game.CTime.TimeToMins))
+        r.min_ms or 0, r.max_ms or 0, warfare.get_time_ref():timeToString(game.CTime.TimeToMins))
 
     CreateTimeEvent(0, "warfare_presim_save", 2, function()
         exec_console_cmd("save " .. (user_name() or "") .. " - presim")
@@ -292,7 +292,7 @@ local function finish(reason)
 end
 
 local function step_body()
-    local now = time_global()
+    local now = warfare.get_realtime()
     if run.last_tick then
         local dt = now - run.last_tick
         run.min_ms = run.min_ms and math.min(run.min_ms, dt) or dt
@@ -353,7 +353,7 @@ end
 local function prepare()
     phase = "preparing"
     run = run or {}
-    prepare_since = time_global()
+    prepare_since = warfare.get_realtime()
     gate_ready_at = nil
     if npe_director and npe_director.Register_dialog then
         npe_director.Register_dialog("warfare_presim")
@@ -368,7 +368,7 @@ local function start_run(p)
     run.elapsed = p.elapsed_min or 0
     run.step = clamp_int(p.step or DEFAULT_STEP, 1, MAX_STEP_MIN)
     run.steps = 0
-    run.t0 = time_global()
+    run.t0 = warfare.get_realtime()
     run.alife = read_alife_params()
     run.actor = { satiety = db.actor.satiety, power = db.actor.power }
     run.simulated_time = simulated_time
@@ -378,7 +378,7 @@ local function start_run(p)
     phase = "running"
 
     warfare_log.info("warfare_presim: start | %s game-min to go of %s (step %s) | game time %s | alife dist=%s opu=%s opt=%s",
-        run.target - run.elapsed, run.target, run.step, game.get_game_time():timeToString(game.CTime.TimeToMins),
+        run.target - run.elapsed, run.target, run.step, warfare.get_time_ref():timeToString(game.CTime.TimeToMins),
         run.alife.dist, run.alife.opu, run.alife.opt)
 
     override_alife()
@@ -566,7 +566,7 @@ local function actor_on_update()
 
     if phase == "preparing" then
         hold_actor()
-        if ready_to_run(time_global()) then
+        if ready_to_run(warfare.get_realtime()) then
             start_run(p)
         end
         return

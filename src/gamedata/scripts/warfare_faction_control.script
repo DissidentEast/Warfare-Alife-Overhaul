@@ -87,15 +87,15 @@ end
 
 local cmd_build_tick = nil
 local cmd_build_items = {}
--- Set to time_global() during the per-spot pass when a selected squad is one of the objects under
+-- Set to warfare.get_realtime() during the per-spot pass when a selected squad is one of the objects under
 -- the cursor. The global "Selected Squads" section (built after the per-spot pass, same frame/tick)
 -- reads it to decide whether the clicked stack actually contains a selected squad.
 local cmd_sel_squad_tick = nil
 -- Add a GLOBAL (not squad-specific) item/header at most once per property-box build, so it doesn't
 -- repeat once per squad when several stack on one map pixel (all per-spot callbacks of one build
--- share the time_global() tick). as_header renders it as a header instead of a clickable item.
+-- share the warfare.get_realtime() tick). as_header renders it as a header instead of a clickable item.
 local function add_global_item(ui, text, as_header)
-    local now = time_global()
+    local now = warfare.get_realtime()
     if now ~= cmd_build_tick then
         cmd_build_tick = now
         cmd_build_items = {}
@@ -122,7 +122,7 @@ local function map_spot_menu_add_property(ui,id,lvl)
         tostring(id), tostring(obj:name()), tostring(lvl), tostring(obj:clsid()),
         tostring(obj:clsid() == clsid.smart_terrain), tostring(is_warfare_squad))
     if is_warfare_squad and warfare_squad_command.is_selected(obj.id) then
-        cmd_sel_squad_tick = time_global()
+        cmd_sel_squad_tick = warfare.get_realtime()
     end
 
     if (obj:clsid() == clsid.smart_terrain) then
@@ -653,7 +653,7 @@ local function map_spot_menu_property_clicked(property_ui,id,level_name,prop,pro
 
     if (prop == str_wrfr[1]) then
         warfare_log.info("faction_control: manual capture requested for smart=%s", tostring(obj:name()))
-        smart_terrain_warfare.manual_point = { obj.id, game.get_game_time(), }
+        smart_terrain_warfare.manual_point = { obj.id, warfare.get_time(), }
         return
     elseif (prop == str_wrfr[6]) then
         local faction = obj.owning_faction
@@ -767,7 +767,7 @@ local function map_right_click_global(property_ui, t)
     -- contains a selected squad (flagged during this frame's per-spot pass) -- not on every unrelated
     -- target just because a selection exists somewhere.
     local at_empty = (not t) or t.object_id == 65535
-    if not (at_empty or cmd_sel_squad_tick == time_global()) then return end
+    if not (at_empty or cmd_sel_squad_tick == warfare.get_realtime()) then return end
     -- Title this section. It acts on the current selection (not the cursor object), so it reads as
     -- its own group -- both on empty terrain and below the per-spot sections in a multi-spot menu.
     add_header(property_ui, str_wrfr[90]) -- "Selected Squads"
@@ -829,7 +829,7 @@ function possess_squad_leader(squad)
         ["sigaret_for_nps"] = true,
     }
     
-    bind_stalker_ext.invulnerable_time = time_global() + 30000
+    bind_stalker_ext.invulnerable_time = warfare.get_realtime() + 30000
     db.actor:set_health_ex(1)
     
     -- make squad actor companions

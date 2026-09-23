@@ -66,7 +66,7 @@ local DEFAULT_HUNT = 50        -- fallback when a community has no faction optio
 local can_fight_mutant
 local smart_battles_only
 local ini_ocs
-local is_enemy, string_find, math_random, math_ceil, math_max, math_pow = game_relations.is_factions_enemies, string.find, math.random, math.ceil, math.max, math.pow
+local is_enemy, string_find, math_random, math_ceil, math_max = game_relations.is_factions_enemies, string.find, math.random, math.ceil, math.max
 
 -- Ignore list
 task_squads = {}
@@ -84,6 +84,7 @@ local last_combat_time = {}    -- [squad_id] = CTime of last combat round
 local skirmish_decline = {}    -- [pair_key] = CTime a pair declined to engage
 local skirmish_incidental = {} -- [pair_key] = true while the pair's combat lock came from a passed roll
 local skirmish_wary = {}       -- [squad_id] = CTime the squad lost a member in a skirmish
+local power_epoch = 0          -- bumped every try_coordinator firing (UPDATE_TIME); ages out squad.wf_member_power
 
 local c_cnt, c_tbl = 0, {} -- enemies collector
 local tbl_smart = {}
@@ -284,8 +285,9 @@ local function smart_terrain_on_update(smart)
                     end
 
                     -- Otherwise, scan for squads in the same map
+                    local pos_1 = squad_1.position
                     for j, id_2 in pairs(tbl_smart) do
-                        in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1)
+                        in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
                         if in_combat then
                             return
                         end
@@ -360,8 +362,9 @@ local function squad_on_update(squad_1)
             end
 
             -- Otherwise, scan for squads in the same map
+            local pos_1 = squad_1.position
             for id_2, _ in pairs(squads_by_level[lid_1]) do
-                in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1)
+                in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
                 if in_combat then
                     return
                 end
@@ -427,10 +430,28 @@ function on_smart_owner_changed(old_faction, new_faction)
     end
 end
 
+-- The smarts warfare_levels.supported_smarts() yields, resolved once. Dropped with the distance
+-- cache, which every options change (the level filter included), every load and the end of
+-- level admission (warfare's one-shot init) go through.
+local supported_objs = nil
+
 -- Drops every faction's cache at once. Needed on an options change (which smarts count, and the
 -- curve shape, both move) and on load (a faction that owned smarts last session may own none now).
 function invalidate_distance_cache()
     epoch_base = epoch_base + 1
+    supported_objs = nil
+end
+
+local function get_supported_objs()
+    if not supported_objs then
+        supported_objs = {}
+        for name,smart in warfare_levels.supported_smarts() do
+            if smart then
+                supported_objs[#supported_objs + 1] = smart
+            end
+        end
+    end
+    return supported_objs
 end
 
 -- The all-smarts scan runs once per faction epoch instead of once per call.
@@ -442,8 +463,10 @@ local function owned_smart_ids(faction)
 
     local ids = {}
     local n = 0
-    for name,smart in warfare_levels.supported_smarts() do
-        if smart and smart.owning_faction == faction then
+    local smarts = get_supported_objs()
+    for i = 1, #smarts do
+        local smart = smarts[i]
+        if smart.owning_faction == faction then
             n = n + 1
             ids[n] = smart.id
         end
@@ -674,6 +697,7 @@ function try_coordinator()
     if not last_coordinator_time then
         warfare_log.debug("try_coordinator: first tick, running coordinator")
         last_coordinator_time = warfare.get_time()
+        power_epoch = power_epoch + 1
         coordinator()
         return
     end
@@ -681,6 +705,7 @@ function try_coordinator()
     if elapsed >= UPDATE_TIME then
         warfare_log.trace("try_coordinator: firing coordinator elapsed=%s update_time=%s", elapsed, UPDATE_TIME)
         last_coordinator_time = warfare.get_time()
+        power_epoch = power_epoch + 1
         coordinator()
     end
 end
@@ -808,10 +833,14 @@ function purge_expired_skirmishes()
     end
 end
 
-function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1)
-    warfare_log.trace("validate_enemy: id_1=%s id_2=%s lid=%s community=%s", id_1, id_2, lid, community_1)
-
+function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1, pos_1)
     if (id_2 == id_1) then
+        return false
+    end
+
+    -- target is not occupied
+    local occupied_by = opponents[id_2]
+    if (occupied_by ~= nil) and (occupied_by ~= id_1) then
         return false
     end
 
@@ -820,152 +849,151 @@ function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1)
     end
 
     local squad_2 = id_2 and sim:object(id_2)
-    local section = squad_2 and squad_2:section_name()
+    if (not squad_2) or squad_2.online then
+        return false
+    end
 
-    if squad_2
-            and (not squad_2.online)
-            and ((opponents[id_2] == id_1) or (opponents[id_2] == nil)) -- target is not occupied
-            --    and (not task_squads[id_2])
-            --    and (not task_giver_squads[id_2])
-            and (not _G.WARFARE or (_G.WARFARE and not ignore_list[section]))
-    then
+    -- Only simulate for close squads
+    local d = distance_to_xz_sqr(pos_1 or squad_1.position, squad_2.position)
+    if (d >= opt_dist) then
+        return false
+    end
 
-        -- Only simulate for enemies
-        local community_2 = squad_2:get_squad_community()
-        if (community_2 ~= "monster" or can_fight_mutant) and pair_hostile(squad_1, community_1, squad_2, community_2) then
+    if _G.WARFARE and ignore_list[squad_2:section_name()] then
+        return false
+    end
 
-            -- Only simulate for close squads
-            local d = distance_to_xz_sqr(squad_1.position, squad_2.position)
-            if (d < opt_dist) then
+    -- Only simulate for enemies
+    local community_2 = squad_2:get_squad_community()
+    if not ((community_2 ~= "monster" or can_fight_mutant) and pair_hostile(squad_1, community_1, squad_2, community_2)) then
+        return false
+    end
 
-                if opt_exclude then
-                    local sid_1 = not squad_1.common
-                    local sid_2 = not squad_2.common
+    warfare_log.trace("validate_enemy: id_1=%s id_2=%s lid=%s community=%s", id_1, id_2, lid, community_1)
 
-                    -- If both are story squads, don't simulate battle
-                    if sid_1 and sid_2 then
-                        warfare_log.debug("validate_enemy: both story squads, skip id_1=%s id_2=%s", id_1, id_2)
-                        return false
+    if opt_exclude then
+        local sid_1 = not squad_1.common
+        local sid_2 = not squad_2.common
 
-                        -- If one is a story squad, kill the other squads incase they have the same target
-                    elseif (sid_1 or sid_2) and (squad_1.assigned_target_id == squad_2.assigned_target_id) then
+        -- If both are story squads, don't simulate battle
+        if sid_1 and sid_2 then
+            warfare_log.debug("validate_enemy: both story squads, skip id_1=%s id_2=%s", id_1, id_2)
+            return false
 
-                        if (sid_1 and NOT_SO_SPECIAL[community_1]) then
+            -- If one is a story squad, kill the other squads incase they have the same target
+        elseif (sid_1 or sid_2) and (squad_1.assigned_target_id == squad_2.assigned_target_id) then
 
-                        elseif (sid_2 and NOT_SO_SPECIAL[community_2]) then
+            if (sid_1 and NOT_SO_SPECIAL[community_1]) then
 
-                        elseif sid_1 then
-                            if squad_is_switching_online(squad_2) then
-                                warfare_log.debug("validate_enemy: victim squad_2=%s switching online, skip story kill", id_2)
-                            else
-                                warfare_log.debug("validate_enemy: story squad_1=%s kills non-story squad_2=%s (shared target)", id_1, id_2)
-                                remove_squad_info(squad_2, id_2, id_1, lid)
-                                local se_attacker = get_random_npc(squad_1)
-                                local member_ids = {}
-                                for k in squad_2:squad_members() do
-                                    member_ids[#member_ids + 1] = k.id
-                                end
-                                for i = 1, #member_ids do
-                                    local victim = alife_object(member_ids[i])
-                                    if victim then
-                                        victim:on_death(se_attacker)
-                                    end
-                                end
-                            end
+            elseif (sid_2 and NOT_SO_SPECIAL[community_2]) then
 
-                        elseif sid_2 then
-                            if squad_is_switching_online(squad_1) then
-                                warfare_log.debug("validate_enemy: victim squad_1=%s switching online, skip story kill", id_1)
-                            else
-                                warfare_log.debug("validate_enemy: story squad_2=%s kills non-story squad_1=%s (shared target)", id_2, id_1)
-                                remove_squad_info(squad_1, id_1, id_2, lid)
-                                local se_attacker = get_random_npc(squad_2)
-                                local member_ids = {}
-                                for k in squad_1:squad_members() do
-                                    member_ids[#member_ids + 1] = k.id
-                                end
-                                for i = 1, #member_ids do
-                                    local victim = alife_object(member_ids[i])
-                                    if victim then
-                                        victim:on_death(se_attacker)
-                                    end
-                                end
-                            end
-                        end
-
-                        return false
+            elseif sid_1 then
+                if squad_is_switching_online(squad_2) then
+                    warfare_log.debug("validate_enemy: victim squad_2=%s switching online, skip story kill", id_2)
+                else
+                    warfare_log.debug("validate_enemy: story squad_1=%s kills non-story squad_2=%s (shared target)", id_1, id_2)
+                    remove_squad_info(squad_2, id_2, id_1, lid)
+                    local se_attacker = get_random_npc(squad_1)
+                    local member_ids = {}
+                    for k in squad_2:squad_members() do
+                        member_ids[#member_ids + 1] = k.id
                     end
-                end
-
-                -- Skip offline combat when one side is a defender at a protected main base
-                -- that STILL belongs to its original faction. The warfare targeting layer
-                -- already prevents squads from attacking main bases, so any nearby enemy
-                -- is just passing through, not attacking.
-                -- Only protect when the main base is held by its original faction.
-                -- If another faction captured it, combat should proceed normally.
-                if _G.WARFARE and warfare_options and warfare_options.options.prevent_mainbase_attacks then
-                    local sm1 = squad_1.assigned_target_id and alife_object(squad_1.assigned_target_id)
-                    if sm1 and sm1.owning_faction == community_1 then
-                        local sm1_name = sm1.name and sm1:name()
-                        local original_faction_1 = sm1_name and smart_terrain_warfare.get_protected_base_faction(sm1_name)
-                        if sm1_name and original_faction_1 and original_faction_1 == community_1 then
-                            warfare_log.debug("validate_enemy: skip protected mainbase squad_1=%s target=%s faction=%s", id_1, sm1_name, community_1)
-                            return false
-                        end
-                    end
-                    local sm2 = squad_2.assigned_target_id and alife_object(squad_2.assigned_target_id)
-                    if sm2 and sm2.owning_faction == community_2 then
-                        local sm2_name = sm2.name and sm2:name()
-                        local original_faction_2 = sm2_name and smart_terrain_warfare.get_protected_base_faction(sm2_name)
-                        if sm2_name and original_faction_2 and original_faction_2 == community_2 then
-                            warfare_log.debug("validate_enemy: skip protected mainbase squad_2=%s target=%s faction=%s", id_2, sm2_name, community_2)
-                            return false
+                    for i = 1, #member_ids do
+                        local victim = alife_object(member_ids[i])
+                        if victim then
+                            victim:on_death(se_attacker)
                         end
                     end
                 end
 
-                -- Two squads crossing paths only fight if one of them is willing.
-                -- Returning false (rather than true) leaves both unlocked and lets
-                -- the caller keep scanning, so a squad that waves this one through
-                -- can still engage somebody else on the same tick.
-                if not should_skirmish(squad_1, squad_2, id_1, id_2, community_1, community_2) then
-                    return false
-                end
-
-                -- Calculate combat rounds from time delta
-                local now = warfare.get_time_ref()
-                local rounds = 1
-                local last_t = last_combat_time[id_1]
-                if last_t then
-                    local elapsed = now:diffSec(last_t)
-                    if elapsed < ROUND_INTERVAL then
-                        -- Not enough time for a round yet, stay locked in combat
-                        return true
+            elseif sid_2 then
+                if squad_is_switching_online(squad_1) then
+                    warfare_log.debug("validate_enemy: victim squad_1=%s switching online, skip story kill", id_1)
+                else
+                    warfare_log.debug("validate_enemy: story squad_2=%s kills non-story squad_1=%s (shared target)", id_2, id_1)
+                    remove_squad_info(squad_1, id_1, id_2, lid)
+                    local se_attacker = get_random_npc(squad_2)
+                    local member_ids = {}
+                    for k in squad_1:squad_members() do
+                        member_ids[#member_ids + 1] = k.id
                     end
-                    rounds = math.floor(elapsed / ROUND_INTERVAL)
-                    if rounds > ROUND_CAP then
-                        warfare_log.warn("!OCS round cap hit: %s vs %s rounds=%s capped=%s elapsed=%s", squad_1:name(), squad_2:name(), rounds, ROUND_CAP, elapsed)
-                        rounds = ROUND_CAP
+                    for i = 1, #member_ids do
+                        local victim = alife_object(member_ids[i])
+                        if victim then
+                            victim:on_death(se_attacker)
+                        end
                     end
                 end
-                last_combat_time[id_1] = warfare.get_time()
+            end
 
-                -- Simulate battle
-                warfare_log.debug("validate_enemy: engage squad_1=%s squad_2=%s dist_sqr=%s rounds=%s", id_1, id_2, d, rounds)
-                simulate_battle(id_1, id_2, squad_1, squad_2, community_1, community_2, lid, rounds)
+            return false
+        end
+    end
 
-                return true
-
-                --[[ Collect enemies to target
-                elseif (not opponents[id_1]) and (_G.WARFARE) then
-                    c_cnt = c_cnt + 1
-                    c_tbl[c_cnt] = id_2
-                --]]
+    -- Skip offline combat when one side is a defender at a protected main base
+    -- that STILL belongs to its original faction. The warfare targeting layer
+    -- already prevents squads from attacking main bases, so any nearby enemy
+    -- is just passing through, not attacking.
+    -- Only protect when the main base is held by its original faction.
+    -- If another faction captured it, combat should proceed normally.
+    if _G.WARFARE and warfare_options and warfare_options.options.prevent_mainbase_attacks then
+        local sm1 = squad_1.assigned_target_id and alife_object(squad_1.assigned_target_id)
+        if sm1 and sm1.owning_faction == community_1 then
+            local sm1_name = sm1.name and sm1:name()
+            local original_faction_1 = sm1_name and smart_terrain_warfare.get_protected_base_faction(sm1_name)
+            if sm1_name and original_faction_1 and original_faction_1 == community_1 then
+                warfare_log.debug("validate_enemy: skip protected mainbase squad_1=%s target=%s faction=%s", id_1, sm1_name, community_1)
+                return false
+            end
+        end
+        local sm2 = squad_2.assigned_target_id and alife_object(squad_2.assigned_target_id)
+        if sm2 and sm2.owning_faction == community_2 then
+            local sm2_name = sm2.name and sm2:name()
+            local original_faction_2 = sm2_name and smart_terrain_warfare.get_protected_base_faction(sm2_name)
+            if sm2_name and original_faction_2 and original_faction_2 == community_2 then
+                warfare_log.debug("validate_enemy: skip protected mainbase squad_2=%s target=%s faction=%s", id_2, sm2_name, community_2)
+                return false
             end
         end
     end
 
-    return false
+    -- Two squads crossing paths only fight if one of them is willing.
+    -- Returning false (rather than true) leaves both unlocked and lets
+    -- the caller keep scanning, so a squad that waves this one through
+    -- can still engage somebody else on the same tick.
+    if not should_skirmish(squad_1, squad_2, id_1, id_2, community_1, community_2) then
+        return false
+    end
+
+    -- Calculate combat rounds from time delta
+    local now = warfare.get_time_ref()
+    local rounds = 1
+    local last_t = last_combat_time[id_1]
+    if last_t then
+        local elapsed = now:diffSec(last_t)
+        if elapsed < ROUND_INTERVAL then
+            -- Not enough time for a round yet, stay locked in combat
+            return true
+        end
+        rounds = math.floor(elapsed / ROUND_INTERVAL)
+        if rounds > ROUND_CAP then
+            warfare_log.warn("!OCS round cap hit: %s vs %s rounds=%s capped=%s elapsed=%s", squad_1:name(), squad_2:name(), rounds, ROUND_CAP, elapsed)
+            rounds = ROUND_CAP
+        end
+    end
+    last_combat_time[id_1] = warfare.get_time()
+
+    -- Simulate battle
+    warfare_log.debug("validate_enemy: engage squad_1=%s squad_2=%s dist_sqr=%s rounds=%s", id_1, id_2, d, rounds)
+    simulate_battle(id_1, id_2, squad_1, squad_2, community_1, community_2, lid, rounds)
+
+    return true
+
+    --[[ Collect enemies to target
+    elseif (not opponents[id_1]) and (_G.WARFARE) then
+        c_cnt = c_cnt + 1
+        c_tbl[c_cnt] = id_2
+    --]]
 end
 
 function simulate_battle(id_1, id_2, squad_1, squad_2, community_1, community_2, lid, rounds)
@@ -1197,15 +1225,27 @@ function calculate_squad_power(squad, community, raw, no_distance)
         return ocs_power[squad.id]
     end
 
-    local power = 0
-    local sim = alife()
     community = community or squad:get_squad_community()
 
-    for k in squad:squad_members() do
-        local se_obj = k.id and k.id ~= 65535 and sim:object(k.id)
+    -- Outside raw (combat) requests the member sum is reused until the squad changes size or the
+    -- next coordinator tick, so rank changes and monster rolls refresh at most every UPDATE_TIME.
+    local power
+    local n = squad:npc_count()
+    local rec = (not raw) and squad.wf_member_power
+    if rec and rec.n == n and rec.community == community and rec.epoch == power_epoch then
+        power = rec.sum
+    else
+        power = 0
+        local sim = alife()
+        for k in squad:squad_members() do
+            local se_obj = k.id and k.id ~= 65535 and sim:object(k.id)
 
-        if (se_obj) then
-            power = power + calculate_npc_power(se_obj, community, nil)
+            if (se_obj) then
+                power = power + calculate_npc_power(se_obj, community, nil)
+            end
+        end
+        if not raw then
+            squad.wf_member_power = { n = n, community = community, epoch = power_epoch, sum = power }
         end
     end
 
@@ -1238,7 +1278,8 @@ function get_random_npc(squad)
 end
 
 function distance_to_xz_sqr(a, b)
-    return math_pow(b.x - a.x, 2) + math_pow(b.z - a.z, 2)
+    local dx, dz = b.x - a.x, b.z - a.z
+    return dx * dx + dz * dz
 end
 
 function get_num_squads_on_level(lvl, faction, mode)

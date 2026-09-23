@@ -50,7 +50,7 @@ end
 
 local old_guards_spawner_spawn_guard = guards_spawner.spawn_guard
 guards_spawner.spawn_guard = function()
-    local cur_game_time = game.get_game_time()
+    local cur_game_time = warfare.get_time_ref()
     if (guards_spawner.upd_tmr and guards_spawner.upd_tmr:diffSec(cur_game_time) > 0) then
         return
     end

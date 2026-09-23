@@ -93,15 +93,20 @@ function printd(e, optionalMessage)
     end
 end
 
--- Thin wrappers over game.get_game_time() kept to avoid touching 70+ call sites.
--- No performance cost worth caring about; provides a hook point if warfare
--- ever needs its own clock again.
+-- Every clock read in warfare goes through these three, so the clocks can change in one place.
+-- get_time: a fresh game-time CTime the caller may store or modify.
+-- get_time_ref: game time for read-only comparisons (diffSec, timeToString).
+-- get_realtime: real milliseconds (time_global); constant within a frame.
 function get_time()
     return game.get_game_time()
 end
 
 function get_time_ref()
     return game.get_game_time()
+end
+
+function get_realtime()
+    return time_global()
 end
 
 -- Saved: all_out_war seeds the relation matrix once per game, never on a later load.
@@ -677,7 +682,7 @@ function actor_on_update()
     end
 
     -- get the current game time
-    local tg = game.get_game_time()
+    local tg = get_time()
 
     -- if last update time doesn't exist, set it.
     if (not last_update) then
@@ -761,6 +766,8 @@ function actor_on_update()
         end
 
         build_level_information()
+        -- level admission is final only now; drop owned/supported smart lists built before it
+        sim_offline_combat.invalidate_distance_cache()
         initialize()
         warfare_levels.update()
         smart_terrain_warfare.build_smart_collections()
@@ -786,7 +793,7 @@ function actor_on_update()
     if (sg.started) then
         if (new_surge) then
             local t = sg.inited_time
-            local diff_sec = math.ceil(game.get_game_time():diffSec(t)/level.get_time_factor())
+            local diff_sec = math.ceil(get_time_ref():diffSec(t)/level.get_time_factor())
 
             if (diff_sec >= 170) then
                 new_surge = false

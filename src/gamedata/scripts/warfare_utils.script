@@ -32,7 +32,7 @@ function subtract_time(time, secs)
         D = D + days_in_month[M]
     end
 
-    local res = game.get_game_time()
+    local res = warfare.get_time()
     res:set(Y, M, D, h, m, s, ms)
     return res
 end
@@ -67,7 +67,7 @@ function add_time(time, secs)
         end
     end
 
-    local res = game.get_game_time()
+    local res = warfare.get_time()
     res:set(Y, M, D, h, m, s, ms)
 
     return res

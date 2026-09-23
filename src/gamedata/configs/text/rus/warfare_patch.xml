@@ -721,4 +721,37 @@
 	<string id="ui_mm_alife_warfare_general_relation_all_pairs_desc">
 		<text>Монолит и Грех тоже участвуют в изменении отношений: меняться могут 66 пар фракций вместо 45.</text>
 	</string>
+	<string id="st_warfare_presim_title">
+		<text>Зона живёт своей жизнью</text>
+	</string>
+	<string id="st_warfare_presim_progress">
+		<text>День %s из %s, %s</text>
+	</string>
+	<string id="st_warfare_presim_emission">
+		<text>Пережидаем выброс, %s</text>
+	</string>
+	<string id="st_warfare_presim_eta">
+		<text>Осталось около %s мин.</text>
+	</string>
+	<string id="st_warfare_presim_desc">
+		<text>Дайте Зоне пожить до вашего появления: группировки поборются за базы, отряды разойдутся по Зоне, пройдут выбросы. Займёт несколько минут реального времени, и до конца симуляции нельзя ни играть, ни сохраняться.</text>
+	</string>
+	<string id="st_warfare_presim_desc_resume">
+		<text>Прерванную симуляцию можно продолжить: просчитано %s из %s игровых часов.</text>
+	</string>
+	<string id="st_warfare_presim_days">
+		<text>Дней</text>
+	</string>
+	<string id="st_warfare_presim_step">
+		<text>Шаг, игровых минут</text>
+	</string>
+	<string id="st_warfare_presim_steps">
+		<text>Шагов: %s</text>
+	</string>
+	<string id="st_warfare_presim_start">
+		<text>Начать</text>
+	</string>
+	<string id="st_warfare_presim_preparing">
+		<text>Подготовка...</text>
+	</string>
 </string_table>

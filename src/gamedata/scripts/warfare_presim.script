@@ -1,0 +1,614 @@
+-- New-game Zone pre-simulation: right after a new game starts a paused dialog offers to let the
+-- A-Life run forward N days in M-minute steps (one step per frame: advance the clock, then
+-- alife():force_update()) behind a black screen, so warfare plays out before the player moves.
+--
+-- Armed only by fill_start_position (new games). State lives in alife_storage_manager so it
+-- survives GAMMA's new-game autosave/reload; `running` marks a run in progress and lets a save taken
+-- mid-run heal the A-Life params it would otherwise keep (switch_distance is saved with the game).
+--
+-- Phases: nil (dialog pending) -> "asking" (dialog up, game frozen) -> "preparing" (black screen,
+-- waiting for warfare's first tick and GAMMA's autosave) -> "running" -> done.
+
+local PPE_ID = 31338
+local STORAGE_KEY = "warfare_presim"
+local DEFAULT_DAYS = 5
+local DEFAULT_STEP = 5
+local DAYS_MIN, DAYS_MAX = 0, 20
+local STEP_MIN, STEP_MAX = 3, 15
+local MAX_STEP_MIN = 59          -- warfare.actor_on_update treats a >1 h delta as a jump, not time
+local MAX_OVERRUN_MIN = 360      -- give up waiting on an emission/psi storm after 6 game hours
+local INVULNERABLE_MS = 60000    -- >7 s ahead also makes bind_stalker_ext refill the actor each frame
+local ARRIVAL_GRACE_MS = 5000
+local FALLBACK_WAIT_MS = 8000
+local SETTLE_MS = 1000
+local ETA_MIN_STEPS = 20
+local NEEDS_MODULES = { sleep = "actor_status_sleep", thirst = "actor_status_thirst" }
+
+local phase = nil
+local screen_ready = false  -- the loading screen ("press any key") is gone
+local dialog = nil      -- keeps the shown dialog's Lua side alive for its callbacks
+local run = nil          -- the active run; also holds the overlay from "preparing" on
+local prepare_since = nil
+local gate_ready_at = nil
+
+local function storage()
+    return alife_storage_manager.get_state()
+end
+
+local function pending()
+    local st = storage()
+    return st and st[STORAGE_KEY]
+end
+
+local function clear_pending()
+    local st = storage()
+    if st then
+        st[STORAGE_KEY] = nil
+    end
+end
+
+local function total_minutes(p)
+    return (p.days or 0) * 1440
+end
+
+local function clamp_int(v, lo, hi)
+    return math.max(lo, math.min(hi, math.floor(tonumber(v) or lo)))
+end
+
+function is_active()
+    return phase ~= nil and phase ~= "asking"
+end
+
+function arm()
+    local st = storage()
+    if not st then
+        warfare_log.err("warfare_presim.arm: no alife storage, cannot arm")
+        return
+    end
+    st[STORAGE_KEY] = { days = DEFAULT_DAYS, step = DEFAULT_STEP, elapsed_min = 0 }
+    warfare_log.info("warfare_presim.arm: armed for the new game")
+end
+
+----------------------------------------------------------------
+-- Game pause (same console switch GAMMA's NPE tutorials use)
+----------------------------------------------------------------
+
+local motionblur = nil
+
+local function freeze_game(on)
+    if on then
+        motionblur = get_console_cmd(0, "ssfx_motionblur")
+        if motionblur then
+            exec_console_cmd("ssfx_motionblur 1,0,0,0")
+        end
+        exec_console_cmd("freeze_time on")
+    else
+        exec_console_cmd("freeze_time off")
+        if motionblur then
+            exec_console_cmd("ssfx_motionblur " .. string.gsub(string.gsub(motionblur, "%(", ""), "%)", ""))
+            motionblur = nil
+        end
+    end
+end
+
+----------------------------------------------------------------
+-- Overlay
+----------------------------------------------------------------
+
+class "PresimOverlay" (CUIScriptWnd)
+
+function PresimOverlay:__init() super()
+    self:SetWndRect(Frect():set(0, 0, 1024, 768))
+    self.title = self:add_line(330, GetFontGraffiti22Russian())
+    self.progress = self:add_line(370, GetFontGraffiti22Russian())
+    self.eta = self:add_line(410, GetFontLetterica18Russian())
+    self.title:SetText(game.translate_string("st_warfare_presim_title"))
+    self.progress:SetText(game.translate_string("st_warfare_presim_preparing"))
+end
+
+function PresimOverlay:add_line(y, font)
+    local line = CUITextWnd()
+    line:SetWndRect(Frect():set(0, y, 1024, 30))
+    line:SetFont(font)
+    line:SetTextColor(GetARGB(255, 200, 200, 200))
+    line:SetTextAlignment(CGameFont.alCenter)
+    self:AttachChild(line)
+    return line
+end
+
+local function clock_text()
+    return string.format("%02d:%02d", level.get_time_hours(), level.get_time_minutes())
+end
+
+local function update_overlay()
+    if not (run and run.overlay and run.target) then
+        return
+    end
+    local ov = run.overlay
+    if run.elapsed >= run.target then
+        ov.progress:SetText(string.format(game.translate_string("st_warfare_presim_emission"), clock_text()))
+    else
+        local days = math.floor(run.target / 1440)
+        local day = math.min(days, math.floor(run.elapsed / 1440) + 1)
+        ov.progress:SetText(string.format(game.translate_string("st_warfare_presim_progress"), day, days, clock_text()))
+    end
+    if run.steps >= ETA_MIN_STEPS and run.elapsed < run.target then
+        local avg_ms = (time_global() - run.t0) / run.steps
+        local steps_left = math.ceil((run.target - run.elapsed) / run.step)
+        local min_left = math.max(1, math.ceil(steps_left * avg_ms / 60000))
+        ov.eta:SetText(string.format(game.translate_string("st_warfare_presim_eta"), min_left))
+    else
+        ov.eta:SetText("")
+    end
+end
+
+local function show_overlay()
+    if run.overlay then
+        return
+    end
+    level.add_pp_effector("black_infinite.ppe", PPE_ID, true)
+    level.hide_indicators_safe()
+    level.disable_input()
+    run.overlay = PresimOverlay()
+    get_hud():AddDialogToRender(run.overlay)
+    update_overlay()
+end
+
+local function hide_overlay()
+    if run.overlay then
+        get_hud():RemoveDialogToRender(run.overlay)
+        run.overlay = nil
+    end
+    level.remove_pp_effector(PPE_ID)
+    level.show_indicators()
+    level.enable_input()
+end
+
+----------------------------------------------------------------
+-- Freeze / unfreeze
+----------------------------------------------------------------
+
+local function read_alife_params()
+    return {
+        dist = alife():switch_distance(),
+        opu = ini_sys:r_u32("alife", "objects_per_update"),
+        opt = ini_sys:r_u32("alife", "process_time"),
+    }
+end
+
+local function apply_alife_params(p)
+    alife():set_switch_distance(p.dist)
+    alife():set_objects_per_update(p.opu)
+    alife():set_process_time(p.opt)
+end
+
+local function override_alife()
+    RemoveTimeEvent(0, "obj_per_upd")
+    alife():set_switch_distance(0)
+    alife():set_objects_per_update(65534)
+    alife():set_process_time(999999)
+end
+
+local function hook_needs()
+    run.needs = {}
+    for factor, name in pairs(NEEDS_MODULES) do
+        local mod = _G[name]
+        if mod and mod.actor_on_update and game_difficulties.get_game_factor(factor) then
+            UnregisterScriptCallback("actor_on_update", mod.actor_on_update)
+            run.needs[#run.needs + 1] = mod
+            warfare_log.info("warfare_presim: paused %s for the run", name)
+        end
+    end
+end
+
+local function unhook_needs()
+    for _, mod in ipairs(run.needs or {}) do
+        RegisterScriptCallback("actor_on_update", mod.actor_on_update)
+    end
+    run.needs = nil
+end
+
+local function mute_sound()
+    run.sound = {
+        music = get_console_cmd(2, "snd_volume_music"),
+        eff = get_console_cmd(2, "snd_volume_eff"),
+    }
+    exec_console_cmd("snd_volume_music 0")
+    exec_console_cmd("snd_volume_eff 0")
+end
+
+local function restore_sound()
+    if run.sound then
+        exec_console_cmd("snd_volume_music " .. tostring(run.sound.music))
+        exec_console_cmd("snd_volume_eff " .. tostring(run.sound.eff))
+        run.sound = nil
+    end
+end
+
+local function hold_actor()
+    bind_stalker_ext.invulnerable_time = time_global() + INVULNERABLE_MS
+    if run.actor then
+        db.actor.satiety = run.actor.satiety
+        db.actor.power = run.actor.power
+    end
+end
+
+local function emission_running()
+    local sm = surge_manager and surge_manager.get_surge_manager()
+    local pm = psi_storm_manager and psi_storm_manager.get_psi_storm_manager()
+    return (sm and sm.started) or (pm and pm.started) or false
+end
+
+-- Simulated-Time-Skip's Travel hook would capture the step; its passthrough flag lets it through.
+local function advance_clock(minutes)
+    local st_mod = run.simulated_time
+    if st_mod then
+        st_mod.passthrough = true
+    end
+    level.change_game_time(0, 0, minutes)
+    if st_mod then
+        st_mod.passthrough = false
+    end
+end
+
+----------------------------------------------------------------
+-- Run
+----------------------------------------------------------------
+
+local function finish(reason)
+    if not run then
+        return
+    end
+    local r = run
+
+    if r.alife then
+        apply_alife_params(r.alife)
+    end
+    unhook_needs()
+    bind_stalker_ext.invulnerable_time = time_global() + ARRIVAL_GRACE_MS
+    restore_sound()
+    hide_overlay()
+    if npe_director and npe_director.Unregister_dialog then
+        npe_director.Unregister_dialog()
+    end
+    clear_pending()
+    run = nil
+    phase = nil
+
+    if not r.t0 then
+        warfare_log.info("warfare_presim: ended before the run started (%s)", reason)
+        return
+    end
+    local total_ms = time_global() - r.t0
+    local avg = r.steps > 0 and math.floor(total_ms / r.steps) or 0
+    warfare_log.info("warfare_presim: done (%s) | simulated %s of %s game-min | %s steps | %s ms real | avg %s ms/step | min %s | max %s | game time %s",
+        reason, r.elapsed - r.start_elapsed, r.target - r.start_elapsed, r.steps, total_ms, avg,
+        r.min_ms or 0, r.max_ms or 0, game.get_game_time():timeToString(game.CTime.TimeToMins))
+
+    CreateTimeEvent(0, "warfare_presim_save", 2, function()
+        exec_console_cmd("save " .. (user_name() or "") .. " - presim")
+        return true
+    end)
+end
+
+local function step_body()
+    local now = time_global()
+    if run.last_tick then
+        local dt = now - run.last_tick
+        run.min_ms = run.min_ms and math.min(run.min_ms, dt) or dt
+        run.max_ms = run.max_ms and math.max(run.max_ms, dt) or dt
+    end
+    run.last_tick = now
+
+    if run.elapsed >= run.target then
+        if not emission_running() then
+            return "complete"
+        end
+        if run.elapsed - run.target >= MAX_OVERRUN_MIN then
+            warfare_log.warn("warfare_presim: emission still running after %s min overrun, stopping", MAX_OVERRUN_MIN)
+            return "overrun cap"
+        end
+    end
+
+    local s = run.step
+    if run.elapsed < run.target then
+        s = math.min(s, run.target - run.elapsed)
+    end
+    advance_clock(s)
+    alife():force_update()
+    run.elapsed = run.elapsed + s
+    run.steps = run.steps + 1
+    hold_actor()
+
+    if run.elapsed - run.saved_elapsed >= 60 then
+        run.saved_elapsed = run.elapsed
+        local p = pending()
+        if p then
+            p.elapsed_min = run.elapsed
+        end
+    end
+
+    update_overlay()
+    return nil
+end
+
+local function step()
+    if not run then
+        return true
+    end
+    local ok, result = pcall(step_body)
+    if not ok then
+        warfare_log.err("warfare_presim: step failed, ending run: %s", result)
+        finish("error")
+        return true
+    end
+    if result then
+        finish(result)
+        return true
+    end
+    return false
+end
+
+-- Black screen + input off right after Start, so the player cannot move while the gates settle.
+local function prepare()
+    phase = "preparing"
+    run = run or {}
+    prepare_since = time_global()
+    gate_ready_at = nil
+    if npe_director and npe_director.Register_dialog then
+        npe_director.Register_dialog("warfare_presim")
+    end
+    hold_actor()
+    show_overlay()
+end
+
+local function start_run(p)
+    run = run or {}
+    run.target = total_minutes(p)
+    run.elapsed = p.elapsed_min or 0
+    run.step = clamp_int(p.step or DEFAULT_STEP, 1, MAX_STEP_MIN)
+    run.steps = 0
+    run.t0 = time_global()
+    run.alife = read_alife_params()
+    run.actor = { satiety = db.actor.satiety, power = db.actor.power }
+    run.simulated_time = simulated_time
+    run.start_elapsed = run.elapsed
+    run.saved_elapsed = run.elapsed
+    p.running = run.alife
+    phase = "running"
+
+    warfare_log.info("warfare_presim: start | %s game-min to go of %s (step %s) | game time %s | alife dist=%s opu=%s opt=%s",
+        run.target - run.elapsed, run.target, run.step, game.get_game_time():timeToString(game.CTime.TimeToMins),
+        run.alife.dist, run.alife.opu, run.alife.opt)
+
+    override_alife()
+    hook_needs()
+    mute_sound()
+    if npe_director and npe_director.Register_dialog then
+        npe_director.Register_dialog("warfare_presim")
+    end
+    hold_actor()
+    show_overlay()
+    AddUniqueCall(step)
+end
+
+----------------------------------------------------------------
+-- Dialog
+----------------------------------------------------------------
+
+class "PresimDialog" (CUIScriptWnd)
+
+function PresimDialog:__init(p) super()
+    self.p = p
+    self:SetWndRect(Frect():set(0, 0, 1024, 768))
+    self:SetAutoDelete(true)
+
+    local xml = CScriptXmlInit()
+    xml:ParseFile("ui_warfare_presim.xml")
+
+    self.back = xml:InitStatic("background", self)
+    xml:InitTextWnd("title", self.back)
+    self.desc = xml:InitTextWnd("desc", self.back)
+    xml:InitTextWnd("days_label", self.back)
+    xml:InitTextWnd("step_label", self.back)
+    self.days_value = xml:InitTextWnd("days_value", self.back)
+    self.step_value = xml:InitTextWnd("step_value", self.back)
+    self.summary = xml:InitTextWnd("summary", self.back)
+
+    self.days_track = xml:InitTrackBar("days_track", self.back)
+    self:Register(self.days_track, "days_track")
+    self.days_track:SetOptIBounds(DAYS_MIN, DAYS_MAX)
+    self.days_track:SetIValue(clamp_int(p.days or DEFAULT_DAYS, DAYS_MIN, DAYS_MAX))
+
+    self.step_track = xml:InitTrackBar("step_track", self.back)
+    self:Register(self.step_track, "step_track")
+    self.step_track:SetOptIBounds(STEP_MIN, STEP_MAX)
+    self.step_track:SetIValue(clamp_int(p.step or DEFAULT_STEP, STEP_MIN, STEP_MAX))
+
+    self.btn_start = xml:Init3tButton("btn_start", self.back)
+    self:Register(self.btn_start, "btn_start")
+    self:AddCallback("btn_start", ui_events.BUTTON_CLICKED, self.OnStart, self)
+
+    self.btn_cancel = xml:Init3tButton("btn_cancel", self.back)
+    self:Register(self.btn_cancel, "btn_cancel")
+    self:AddCallback("btn_cancel", ui_events.BUTTON_CLICKED, self.OnCancel, self)
+
+    local done = p.elapsed_min or 0
+    if done > 0 then
+        self.desc:SetText(string.format(game.translate_string("st_warfare_presim_desc_resume"),
+            math.floor(done / 60), math.floor(total_minutes(p) / 60)))
+    end
+    self:Refresh()
+end
+
+function PresimDialog:Refresh()
+    local days = self.days_track:GetIValue()
+    local step_min = self.step_track:GetIValue()
+    if days == self.shown_days and step_min == self.shown_step then
+        return
+    end
+    self.shown_days = days
+    self.shown_step = step_min
+    self.days_value:SetText(tostring(days))
+    self.step_value:SetText(tostring(step_min))
+    local steps = math.ceil(math.max(0, days * 1440 - (self.p.elapsed_min or 0)) / step_min)
+    self.summary:SetText(string.format(game.translate_string("st_warfare_presim_steps"), steps))
+    self.btn_start:Enable(days > 0)
+end
+
+function PresimDialog:Update()
+    CUIScriptWnd.Update(self)
+    self:Refresh()
+end
+
+function PresimDialog:Close()
+    if self:IsShown() then
+        self:HideDialog()
+    end
+    dialog = nil
+    freeze_game(false)
+    if npe_director and npe_director.Unregister_dialog then
+        npe_director.Unregister_dialog()
+    end
+end
+
+function PresimDialog:OnStart()
+    local days = self.days_track:GetIValue()
+    if phase ~= "asking" or days <= 0 then
+        return
+    end
+    self.p.days = days
+    self.p.step = self.step_track:GetIValue()
+    self:Close()
+    warfare_log.info("warfare_presim: player started %s days at %s-min steps", self.p.days, self.p.step)
+    prepare()
+end
+
+function PresimDialog:OnCancel()
+    if phase ~= "asking" then
+        return
+    end
+    self:Close()
+    warfare_log.info("warfare_presim: player skipped, disarming")
+    clear_pending()
+    phase = nil
+end
+
+function PresimDialog:OnKeyboard(dik, keyboard_action)
+    CUIScriptWnd.OnKeyboard(self, dik, keyboard_action)
+    if keyboard_action == ui_events.WINDOW_KEY_PRESSED then
+        if dik == DIK_keys.DIK_ESCAPE then
+            self:OnCancel()
+        elseif dik == DIK_keys.DIK_RETURN or dik == DIK_keys.DIK_NUMPADENTER then
+            self:OnStart()
+        end
+    end
+    return true
+end
+
+local function open_dialog(p)
+    phase = "asking"
+    if npe_director and npe_director.Register_dialog then
+        npe_director.Register_dialog("warfare_presim")
+    end
+    freeze_game(true)
+    dialog = PresimDialog(p)
+    dialog:ShowDialog(true)
+    warfare_log.info("warfare_presim: dialog shown (days=%s step=%s done=%s)", p.days, p.step, p.elapsed_min or 0)
+end
+
+----------------------------------------------------------------
+-- Gate
+----------------------------------------------------------------
+
+-- A running marker in storage outside a live run means a save was taken mid-run.
+local function heal_interrupted(p)
+    if p.running and phase ~= "running" then
+        warfare_log.warn("warfare_presim: interrupted run found, restoring alife dist=%s opu=%s opt=%s",
+            p.running.dist, p.running.opu, p.running.opt)
+        apply_alife_params(p.running)
+        p.running = nil
+    end
+end
+
+-- itms_manager gives start_equippment_handled right before the new-game autosave; the timeout
+-- covers test mode and builds without it.
+local function ready_to_run(now)
+    if not (IsWarfare() and warfare.initialized) then
+        return false
+    end
+    local st = storage()
+    if warfare.pending_spawn_stagger or (st and st.warfare_pending_spawn_stagger) then
+        return false
+    end
+    if not (has_alife_info("start_equippment_handled") or now - prepare_since >= FALLBACK_WAIT_MS) then
+        return false
+    end
+    if not gate_ready_at then
+        gate_ready_at = now + SETTLE_MS
+    end
+    return now >= gate_ready_at
+end
+
+local function actor_on_update()
+    if phase == "asking" or phase == "running" then
+        return
+    end
+    local p = pending()
+    if not p then
+        if phase == "preparing" then
+            finish("storage lost")
+        end
+        UnregisterScriptCallback("actor_on_update", actor_on_update)
+        return
+    end
+    heal_interrupted(p)
+
+    if phase == "preparing" then
+        hold_actor()
+        if ready_to_run(time_global()) then
+            start_run(p)
+        end
+        return
+    end
+
+    if not screen_ready or (npe_director and npe_director.Dialog_in_use) then
+        return
+    end
+    open_dialog(p)
+end
+
+local function on_loading_screen_dismissed()
+    screen_ready = true
+end
+
+local function on_before_save_input(flags)
+    if phase then
+        flags.ret = true
+    end
+end
+
+local function on_game_load()
+    if not DEV_DEBUG then
+        return
+    end
+    local CMD = debug_cmd_list.command_get_list()
+    function CMD.warfare_presim(me, txt, owner)
+        local days = tonumber(string.match(txt or "", "^%s*(%S+)"))
+        if not days or days <= 0 or phase then
+            owner:SendOutput("warfare_presim <days> [step_minutes] (not while one is pending)")
+            return
+        end
+        local p = { days = days, step = tonumber(string.match(txt, "^%s*%S+%s+(%S+)")) or DEFAULT_STEP, elapsed_min = 0 }
+        storage()[STORAGE_KEY] = p
+        start_run(p)
+        owner:SendOutput("-Presim started")
+    end
+end
+
+function on_game_start()
+    RegisterScriptCallback("actor_on_update", actor_on_update)
+    RegisterScriptCallback("on_loading_screen_dismissed", on_loading_screen_dismissed)
+    RegisterScriptCallback("on_before_save_input", on_before_save_input)
+    RegisterScriptCallback("on_game_load", on_game_load)
+end

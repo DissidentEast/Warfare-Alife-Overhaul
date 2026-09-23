@@ -888,6 +888,7 @@ function fill_start_position()
     -- so it runs from the actor_on_update one-shot init -- possibly after GAMMA's
     -- autosave-and-reload of the freshly created game, hence the persisted flag.
     arm_spawn_stagger("new game")
+    warfare_presim.arm()
 
     if (warfare_options.options.random_starting_locations) then
         warfare_log.info("fill_start_position: random_starting_locations enabled, deferring")

@@ -726,4 +726,37 @@
 	<string id="ui_mm_alife_warfare_general_relation_all_pairs_desc">
 		<text>Lets Monolith and Sin take part in relation changes: 66 faction pairs can move instead of 45.</text>
 	</string>
+	<string id="st_warfare_presim_title">
+		<text>The Zone lives on</text>
+	</string>
+	<string id="st_warfare_presim_progress">
+		<text>Day %s of %s, %s</text>
+	</string>
+	<string id="st_warfare_presim_emission">
+		<text>Waiting out the emission, %s</text>
+	</string>
+	<string id="st_warfare_presim_eta">
+		<text>About %s min left</text>
+	</string>
+	<string id="st_warfare_presim_desc">
+		<text>Let the Zone live before you arrive: factions fight over bases, squads spread out, emissions sweep the Zone. Takes several minutes of real time; you cannot play or save until it ends.</text>
+	</string>
+	<string id="st_warfare_presim_desc_resume">
+		<text>An interrupted simulation can continue: %s of %s game hours are done.</text>
+	</string>
+	<string id="st_warfare_presim_days">
+		<text>Days</text>
+	</string>
+	<string id="st_warfare_presim_step">
+		<text>Step, game minutes</text>
+	</string>
+	<string id="st_warfare_presim_steps">
+		<text>%s steps</text>
+	</string>
+	<string id="st_warfare_presim_start">
+		<text>Start</text>
+	</string>
+	<string id="st_warfare_presim_preparing">
+		<text>Preparing...</text>
+	</string>
 </string_table>

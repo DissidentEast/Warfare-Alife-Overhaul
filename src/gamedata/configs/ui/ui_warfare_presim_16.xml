@@ -1,0 +1,39 @@
+<w>
+	<background x="241" y="256" width="542" height="255" stretch="1">
+		<texture>ui_inGame2_message_box</texture>
+	</background>
+
+	<title x="32" y="20" width="478" height="26" complex_mode="0">
+		<text font="graffiti22" align="c" vert_align="c" r="230" g="230" b="230">st_warfare_presim_title</text>
+	</title>
+	<desc x="40" y="50" width="462" height="52" complex_mode="1">
+		<text font="letterica16" align="c" vert_align="c" r="180" g="180" b="180">st_warfare_presim_desc</text>
+	</desc>
+
+	<days_label x="48" y="110" width="136" height="20" complex_mode="0">
+		<text font="letterica16" align="l" vert_align="c" r="200" g="200" b="200">st_warfare_presim_days</text>
+	</days_label>
+	<days_track x="188" y="112" width="264" height="16" is_integer="1" step="1"/>
+	<days_value x="458" y="108" width="40" height="22" complex_mode="0">
+		<text font="letterica18" align="c" vert_align="c" r="200" g="200" b="200"></text>
+	</days_value>
+	<step_label x="48" y="142" width="136" height="20" complex_mode="0">
+		<text font="letterica16" align="l" vert_align="c" r="200" g="200" b="200">st_warfare_presim_step</text>
+	</step_label>
+	<step_track x="188" y="144" width="264" height="16" is_integer="1" step="1"/>
+	<step_value x="458" y="140" width="40" height="22" complex_mode="0">
+		<text font="letterica18" align="c" vert_align="c" r="200" g="200" b="200"></text>
+	</step_value>
+	<summary x="40" y="174" width="462" height="22" complex_mode="0">
+		<text font="letterica16" align="c" vert_align="c" r="150" g="150" b="150"></text>
+	</summary>
+
+	<btn_start x="167" y="212" width="102" height="28" check_mode="0" stretch="1">
+		<text font="letterica18">st_warfare_presim_start</text>
+		<texture>ui_inGame2_Mp_bigbuttone</texture>
+	</btn_start>
+	<btn_cancel x="273" y="212" width="102" height="28" check_mode="0" stretch="1">
+		<text font="letterica18">Btn_Cancel</text>
+		<texture>ui_inGame2_Mp_bigbuttone</texture>
+	</btn_cancel>
+</w>

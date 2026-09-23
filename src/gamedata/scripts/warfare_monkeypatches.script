@@ -997,3 +997,10 @@ function task_objects.CGeneralTask.check_task(self, tm)
     warfare_log.info("CGeneralTask.check_task: task=%s giver dead, marking fail", tostring(self.id))
     self.last_check_task = "fail"
 end
+
+-- warfare caches game time per frame; a time jump inside a frame must drop that cache
+local old_level_change_game_time = level.change_game_time
+function level.change_game_time(days, hours, minutes)
+    old_level_change_game_time(days, hours, minutes)
+    warfare.reset_frame_clock()
+end

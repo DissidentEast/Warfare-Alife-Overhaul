@@ -1,88 +1,46 @@
+-- Scratch duration for add_time/subtract_time; never returned or stored.
+-- setHMS(0, 0, s) is exactly s * 1000 ms: the engine does not normalise the fields.
+local span = nil
+
+local function span_of(secs)
+    span = span or game.CTime()
+    span:setHMS(0, 0, secs)
+    return span
+end
+
+-- New CTime secs (whole seconds, fraction truncated) before time.
 function subtract_time(time, secs)
-    local Y, M, D, h, m, s, ms = 0, 0, 0, 0, 0, 0, 0
-    Y, M, D, h, m, s, ms = time:get(Y, M, D, h, m, s, ms)
-
-    local day_secs = h * 3600 + m * 60 + s - secs
-
-    while day_secs < 0 do
-        D = D - 1
-        day_secs = day_secs + 86400
+    if secs < 0 then
+        return add_time(time, -secs)
     end
-
-    h = math.floor(day_secs / 3600)
-    day_secs = day_secs % 3600
-    m = math.floor(day_secs / 60)
-    s = day_secs % 60
-
-    local days_in_month = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-    if Y % 4 == 0 and (Y % 100 ~= 0 or Y % 400 == 0) then
-        days_in_month[2] = 29
-    end
-    while D < 1 do
-        M = M - 1
-        if M < 1 then
-            M = 12
-            Y = Y - 1
-            if Y % 4 == 0 and (Y % 100 ~= 0 or Y % 400 == 0) then
-                days_in_month[2] = 29
-            else
-                days_in_month[2] = 28
-            end
-        end
-        D = D + days_in_month[M]
-    end
-
-    local res = warfare.get_time()
-    res:set(Y, M, D, h, m, s, ms)
+    local res = game.CTime(time)
+    res:sub(span_of(secs))
     return res
 end
 
+-- New CTime secs (whole seconds, fraction truncated) after time.
 function add_time(time, secs)
-    local Y, M, D, h, m, s, ms = 0, 0, 0, 0, 0, 0, 0
-    Y, M, D, h, m, s, ms = time:get(Y, M, D, h, m, s, ms)
-    s = s + secs
-    m = m + math.floor(s / 60)
-    s = s % 60
-    h = h + math.floor(m / 60)
-    m = m % 60
-    D = D + math.floor(h / 24)
-    h = h % 24
-
-    local days_in_month = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
-    if Y % 4 == 0 and (Y % 100 ~= 0 or Y % 400 == 0) then
-        days_in_month[2] = 29
+    if secs < 0 then
+        return subtract_time(time, -secs)
     end
-
-    while D > days_in_month[M] do
-        D = D - days_in_month[M]
-        M = M + 1
-        if M > 12 then
-            M = 1
-            Y = Y + 1
-            if Y % 4 == 0 and (Y % 100 ~= 0 or Y % 400 == 0) then
-                days_in_month[2] = 29
-            else
-                days_in_month[2] = 28
-            end
-        end
-    end
-
-    local res = warfare.get_time()
-    res:set(Y, M, D, h, m, s, ms)
-
+    local res = game.CTime(time)
+    res:add(span_of(secs))
     return res
 end
 
 -- Returns current hour from game clock
 function get_warfare_hour()
-    local h = get_warfare_hms()
+    local h = warfare.get_hms()
     return h
 end
 
--- Returns h, m, s from a CTime object (or warfare virtual clock if none given)
+-- Returns h, m, s from a CTime object (or the warfare frame clock if none given)
 function get_warfare_hms(time_obj)
+    if not time_obj then
+        return warfare.get_hms()
+    end
     local Y, M, D, h, m, s, ms = 0, 0, 0, 0, 0, 0, 0
-    Y, M, D, h, m, s, ms = (time_obj or warfare.get_time_ref()):get(Y, M, D, h, m, s, ms)
+    Y, M, D, h, m, s, ms = time_obj:get(Y, M, D, h, m, s, ms)
     return h, m, s
 end
 

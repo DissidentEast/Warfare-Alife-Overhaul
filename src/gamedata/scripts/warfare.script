@@ -93,16 +93,50 @@ function printd(e, optionalMessage)
     end
 end
 
--- Every clock read in warfare goes through these three, so the clocks can change in one place.
+-- Every clock read in warfare goes through these, so the clocks can change in one place.
 -- get_time: a fresh game-time CTime the caller may store or modify.
--- get_time_ref: game time for read-only comparisons (diffSec, timeToString).
+-- get_time_ref: game time for read-only comparisons (diffSec, get, timeToString). One object is
+--   shared by every caller in a frame: never store it or modify it.
+-- get_hms: hour, minute, second of get_time_ref.
 -- get_realtime: real milliseconds (time_global); constant within a frame.
-function get_time()
-    return game.get_game_time()
+--
+-- Game time only moves between frames, or inside one through level.change_game_time, so the frame
+-- value is cleared on actor_on_update (every frame) and by the change_game_time wrapper in
+-- warfare_monkeypatches. Without an actor nothing clears it, so reads go to the engine.
+local frame_time = nil
+local frame_h, frame_m, frame_s = nil, nil, nil
+
+function reset_frame_clock()
+    frame_time = nil
+    frame_h = nil
 end
 
 function get_time_ref()
-    return game.get_game_time()
+    if not db.actor then
+        return game.get_game_time()
+    end
+    local t = frame_time
+    if t == nil then
+        t = game.get_game_time()
+        frame_time = t
+    end
+    return t
+end
+
+function get_time()
+    return game.CTime(get_time_ref())
+end
+
+function get_hms()
+    if (frame_h ~= nil) and db.actor then
+        return frame_h, frame_m, frame_s
+    end
+    local Y, M, D, h, m, s, ms = 0, 0, 0, 0, 0, 0, 0
+    Y, M, D, h, m, s, ms = get_time_ref():get(Y, M, D, h, m, s, ms)
+    if db.actor then
+        frame_h, frame_m, frame_s = h, m, s
+    end
+    return h, m, s
 end
 
 function get_realtime()
@@ -1442,6 +1476,7 @@ function on_game_start()
     _G.WARFARE = true
     RegisterScriptCallback("smart_terrain_on_update", smart_terrain_warfare.smart_terrain_on_update)
     RegisterScriptCallback("squad_on_update", sim_squad_warfare.squad_on_update)
+    RegisterScriptCallback("actor_on_update", reset_frame_clock)
     RegisterScriptCallback("actor_on_update", actor_on_update)
     RegisterScriptCallback("save_state", save_state)
     RegisterScriptCallback("squad_on_npc_death", sim_squad_warfare.squad_on_npc_death)

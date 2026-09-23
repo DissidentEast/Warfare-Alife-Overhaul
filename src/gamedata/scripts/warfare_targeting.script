@@ -53,6 +53,11 @@ function can_garrison(other, faction)
         return true
     end
 
+    -- Loners and ecologists may stay anywhere a non-enemy holds, as guests.
+    if warfare_behavior.is_independent(faction) and not game_relations.is_factions_enemies(faction, owner) then
+        return true
+    end
+
     local props = other.props
     if (props ~= nil) and (props.base < 1) then
         return warfare_behavior.holdings_are_open(owner)

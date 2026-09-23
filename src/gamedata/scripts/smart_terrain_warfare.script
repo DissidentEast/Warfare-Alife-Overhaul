@@ -206,6 +206,7 @@ local BASE_INTAKE_SLACK = 0                     -- headroom above the occupancy 
                                                 -- 0 leaves a hysteresis band of exactly one squad: a base at capacity
                                                 -- neither accepts nor evicts. Any higher value guarantees that a base
                                                 -- sitting at capacity accepts a squad and immediately evicts it again.
+local GUEST_SLOTS = 2                           -- loner/ecolog squads a non-enemy foreign base hosts at once, outside its garrison
 local currently_surge = false
 local reset_defense_timer = {}
 local previous_owner = {}                                        -- have to use this, since using smart.last_owner messes with the pda icons
@@ -1813,6 +1814,49 @@ function base_can_accept(smart, faction, incoming)
     warfare_log.trace("base_can_accept: no intake smart=%s regular=%s stat=%s incoming=%s max=%s",
         smart:name(), tostring(regular_squads), tostring(stationary_sq_num), tostring(en_route), tostring(max_allowable_size))
     return false
+end
+
+
+function base_can_host(smart, faction)
+--[[
+    "Can I take one more guest?" - may a loner or ecologist squad wait at this non-enemy
+    foreign base? Guests sit outside the owner's garrison: they count against GUEST_SLOTS
+    only, never against the owner's cap.
+
+    Guests are independent squads of another faction than the owner whose target is this
+    smart. A squad joins its target's roster on its first update after set_target, so
+    squads on their way are included.
+
+    Inputs:
+        smart: candidate base
+        faction: faction string of the squad being placed
+    Returns:
+        boolean true/false whether the base can host another guest
+]]
+    if not (smart.props and smart.props.base > 0) then
+        return false
+    end
+
+    local owner = smart.owning_faction or "none"
+    if (owner == "none") or (owner == faction) or is_factions_enemies(faction, owner) then
+        return false
+    end
+
+    local guests = 0
+    for sid,_ in pairs(SIMBOARD.smarts[smart.id].squads) do
+        local squad = resolve_roster_squad(smart.id, sid)
+        local community = squad and squad:get_squad_community()
+        if community and (community ~= owner) and (squad.current_target_id == smart.id)
+        and warfare_behavior.is_independent(community) then
+            guests = guests + 1
+            if (guests >= GUEST_SLOTS) then
+                warfare_log.trace("base_can_host: no guest slot smart=%s faction=%s", smart:name(), faction)
+                return false
+            end
+        end
+    end
+
+    return true
 end
 
 
@@ -3575,7 +3619,8 @@ local function find_lairs(smart, squad)
     return pick(squad, all)
 end
 
--- Bases a squad may fall back to: empty, or non-hostile with room. Hubs with room go to priority.
+-- Bases a squad may fall back to: empty, its own with intake room, or a non-enemy's with a guest
+-- slot. Hubs go to priority.
 local function collect_base(faction, other, priority, bucket)
     if not (other.props and other.props.base > 0) then
         return
@@ -3584,7 +3629,9 @@ local function collect_base(faction, other, priority, bucket)
     local list
     if owner == "none" then
         list = bucket
-    elseif not is_factions_enemies(faction, owner) and squad_count(other, owner) < other.max_population then
+    elseif (owner == faction) and base_can_accept(other, faction) then
+        list = travel_hubs[other:name()] and priority or bucket
+    elseif (owner ~= faction) and base_can_host(other, faction) then
         list = travel_hubs[other:name()] and priority or bucket
     end
     if list then
@@ -5298,11 +5345,19 @@ function check_owner(smart)
     local owner_displaceable = warfare_behavior.displaceable_at_peace(smart.owning_faction) or owner_zombied
     -- nil props is treated as "not a plain point", matching the previous inline test
     local is_nonbase = (smart.props ~= nil) and (smart.props.base < 1)
+    -- A protected main base that its faction holds, or that stands empty, never passes to a
+    -- non-enemy of that faction: squads of those factions are guests there.
+    local home_faction = warfare_options.options.prevent_mainbase_attacks and get_protected_base_faction(smart:name())
+    if home_faction and (smart.owning_faction ~= home_faction) and ((smart.owning_faction or "none") ~= "none") then
+        home_faction = nil
+    end
 
     -- New faction owner = who has highest squad count on the smart + smart has no owner
     local owner = "none"
     for faction,count in pairs(squadCount) do
-        if (faction ~= "monster") then
+        if home_faction and (faction ~= home_faction) and not is_factions_enemies(faction, home_faction) then
+            -- guest: never a candidate owner
+        elseif (faction ~= "monster") then
             if (faction ~= smart.owning_faction)
             and (not warfare_behavior.holdings_are_open(faction) and faction ~= "zombied")
             and (owner_open or owner_displaceable)

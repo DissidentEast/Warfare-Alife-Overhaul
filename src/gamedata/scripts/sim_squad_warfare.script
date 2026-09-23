@@ -231,7 +231,9 @@ function squad_warfare_update(squad)
                             -- A non-enemy smart owned by a *different* faction that isn't
                             -- loner/ecolog can be neither captured nor hijacked. Don't let the
                             -- squad garrison it (it would get adopted by the foreign smart and
-                            -- orphaned there forever) — redirect it instead.
+                            -- orphaned there forever) — redirect it instead. Loner and ecolog
+                            -- squads are the exception: they stay as guests and their own
+                            -- dispatcher moves them on.
                             --
                             -- This test is warfare_targeting.can_garrison, and every dispatcher
                             -- that chooses a destination is now required to satisfy it, so a

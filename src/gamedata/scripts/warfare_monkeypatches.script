@@ -1004,3 +1004,74 @@ function level.change_game_time(days, hours, minutes)
     old_level_change_game_time(days, hours, minutes)
     warfare.reset_frame_clock()
 end
+
+-- simulation_objects finds a registered object by id with a linear scan over object_registry.
+-- by_id mirrors that array (first entry per id wins, as in the scan). register/unregister keep it
+-- current; if the array or its size changes any other way, the next lookup rebuilds it.
+-- Remove once the required engine/base scripts ship an indexed get_server_entity.
+local so = simulation_objects
+if type(so.object_registry) == "table" and type(so.object_registry_size) == "number" then
+    local by_id = {}
+    local indexed_reg, indexed_size = nil, -1
+    local drift_warned = false
+
+    local function rebuild()
+        by_id = {}
+        local reg, n = so.object_registry, so.object_registry_size
+        for i = n, 1, -1 do
+            local se_obj = reg[i]
+            by_id[se_obj.id] = se_obj
+        end
+        indexed_reg, indexed_size = reg, n
+    end
+
+    local function in_sync()
+        return so.object_registry == indexed_reg and so.object_registry_size == indexed_size
+    end
+
+    rebuild()
+
+    local old_register = so.register
+    function so.register(se_obj)
+        local synced = in_sync()
+        old_register(se_obj)
+        local n = so.object_registry_size
+        if synced and n == indexed_size + 1 and so.object_registry[n] == se_obj then
+            local id = se_obj.id
+            if by_id[id] == nil then
+                by_id[id] = se_obj
+            end
+            indexed_size = n
+        end
+    end
+
+    local old_unregister = so.unregister
+    function so.unregister(se_obj)
+        local synced = in_sync()
+        old_unregister(se_obj)
+        local n = so.object_registry_size
+        if synced and n == indexed_size - 1 then
+            local id, reg, first = se_obj.id, so.object_registry, nil
+            for i = 1, n do
+                if reg[i].id == id then
+                    first = reg[i]
+                    break
+                end
+            end
+            by_id[id] = first
+            indexed_size = n
+        end
+    end
+
+    function so.get_server_entity(id)
+        if not in_sync() then
+            if not drift_warned then
+                drift_warned = true
+                warfare_log.warn("simulation_objects.object_registry changed outside register/unregister (size %s, indexed %s); rebuilding id index",
+                    so.object_registry_size, indexed_size)
+            end
+            rebuild()
+        end
+        return by_id[id]
+    end
+end

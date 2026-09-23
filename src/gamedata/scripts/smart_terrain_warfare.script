@@ -5233,10 +5233,6 @@ function check_owner(smart)
         return
     end
 
-    if (owner == "monster") then
-        owner = "none"
-    end
-
     local squadCount, squadPowers = squad_count_defending_all(smart)
 
     -- Two different concessions, so they gate on two different traits: an open-holdings owner gives
@@ -5252,7 +5248,7 @@ function check_owner(smart)
     -- New faction owner = who has highest squad count on the smart + smart has no owner
     local owner = "none"
     for faction,count in pairs(squadCount) do
-        if (faction ~= monster) then
+        if (faction ~= "monster") then
             if (faction ~= smart.owning_faction)
             and (not warfare_behavior.holdings_are_open(faction) and faction ~= "zombied")
             and (owner_open or owner_displaceable)

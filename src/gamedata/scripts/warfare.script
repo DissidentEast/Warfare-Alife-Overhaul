@@ -106,11 +106,13 @@ end
 --
 -- frame_clock.t: the frame value once something has read it this frame, else nil. Hot modules may
 -- read it directly (falling back to get_time_ref); it follows get_time_ref's read-only contract.
-frame_clock = { t = nil }
+-- frame_clock.n: bumped on every reset; per-frame caches compare it to know they are stale.
+frame_clock = { t = nil, n = 0 }
 local frame_h, frame_m, frame_s = nil, nil, nil
 
 function reset_frame_clock()
     frame_clock.t = nil
+    frame_clock.n = frame_clock.n + 1
     frame_h = nil
 end
 

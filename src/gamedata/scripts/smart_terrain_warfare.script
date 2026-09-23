@@ -164,6 +164,36 @@ function get_linked_smart_collection(level_id)
     return linked_smart_collection[level_id] or {}
 end
 
+-- The bases of get_linked_smart_collection(level_id), in the same order.
+function get_linked_base_collection(level_id)
+    return linked_base_collection[level_id] or {}
+end
+
+local level_base_pools = {}     -- [level_id] = { src = level smarts list, n = its length, ids = bases }
+
+-- The bases of warfare_levels.level_information[level_id].smarts, in the same order; nil when the
+-- level has no smart list. Rebuilt if that list is replaced or grows.
+function get_level_base_collection(level_id)
+    local info = warfare_levels.level_information[level_id]
+    local smarts = info and info.smarts
+    if not (smarts) then
+        return nil
+    end
+    local pool = level_base_pools[level_id]
+    if pool and (pool.src == smarts) and (pool.n == #smarts) then
+        return pool.ids
+    end
+    local ids = {}
+    for i = 1, #smarts do
+        local smart = smarts[i] and alife_object(smarts[i])
+        if smart and smart.props and smart.props.base >= 1 then
+            ids[#ids + 1] = smarts[i]
+        end
+    end
+    level_base_pools[level_id] = { src = smarts, n = #smarts, ids = ids }
+    return ids
+end
+
 -- Timer used for capturing smart terrains.
 point_cap_timers = {}
 smart_owners = {}
@@ -1483,7 +1513,9 @@ function recall_squad_to_base(from_smart, squad, caller)
     local faction = squad:get_squad_community()
     caller = caller or "recall_squad_to_base"
 
-    local bases = warfare_targeting.find_rest_targets(from_smart, faction, false)
+    local incoming = build_incoming_map(faction)
+
+    local bases = warfare_targeting.find_rest_targets(from_smart, faction, false, incoming)
     if (#bases > 0) then
         warfare_log.debug("recall_squad_to_base: squad=%s -> base=%s on-level (%s)",
             squad.id, bases[1][2], caller)
@@ -1491,7 +1523,7 @@ function recall_squad_to_base(from_smart, squad, caller)
         return true
     end
 
-    local linked = warfare_targeting.find_rest_targets(from_smart, faction, true)
+    local linked = warfare_targeting.find_rest_targets(from_smart, faction, true, incoming)
     if (#linked > 0) then
         warfare_log.debug("recall_squad_to_base: squad=%s -> base=%s cross-level (%s)",
             squad.id, linked[1][2], caller)
@@ -1499,7 +1531,7 @@ function recall_squad_to_base(from_smart, squad, caller)
         return true
     end
 
-    if send_to_main_base(from_smart, squad, faction, caller) then
+    if send_to_main_base(from_smart, squad, faction, caller, incoming) then
         return true
     end
 
@@ -1509,7 +1541,7 @@ function recall_squad_to_base(from_smart, squad, caller)
 end
 
 
-function send_to_main_base(from_smart, squad, faction, caller)
+function send_to_main_base(from_smart, squad, faction, caller, incoming)
 --[[
     Last resort placement: head for the faction's closest main base that it still holds
     or that is empty (capturable). Every faction has a main base, so a failure here is
@@ -1520,6 +1552,7 @@ function send_to_main_base(from_smart, squad, faction, caller)
         squad: alife object of the squad
         faction: squad's faction
         caller: caller name, for the log line only
+        incoming: optional build_incoming_map(faction) result the caller already has
     Returns:
         true if a target was set, false if the faction holds no reachable main base
 ]]
@@ -1528,7 +1561,7 @@ function send_to_main_base(from_smart, squad, faction, caller)
         return false
     end
 
-    local incoming = build_incoming_map(faction)
+    incoming = incoming or build_incoming_map(faction)
 
     local best, best_dist
     for i = 1, #main_bases do
@@ -4085,6 +4118,40 @@ function seen_by_outpost(lvl, position, include_allies)
     return false
 end
 
+-- Hint text of a smart's own map spot. kind: "info" (live owner and counts) or "unknown" (fog-of-war
+-- memory). smart.warfare_hint records the kind so refresh_smart_hints can rebuild the same text.
+local function smart_hint(smart, kind)
+    if (kind == "unknown") then
+        return get_unknown_info(smart)
+    end
+    return get_warfare_info(smart)
+end
+
+local function add_smart_spot(smart, key, kind)
+    level.map_add_object_spot(smart.id, pda_icons[key], smart_hint(smart, kind))
+    smart.warfare_spot = key
+    smart.warfare_hint = kind
+end
+
+-- Hints are only visible with the PDA open, so the text is skipped while it is closed;
+-- refresh_smart_hints rewrites every spot's hint when the PDA opens.
+local function update_smart_hint(smart, key, kind)
+    smart.warfare_hint = kind
+    if sim_squad_warfare.is_pda_open() then
+        level.map_change_spot_hint(smart.id, pda_icons[key], smart_hint(smart, kind))
+    end
+end
+
+function refresh_smart_hints()
+    for _, entry in pairs(SIMBOARD.smarts) do
+        local smart = entry.smrt
+        local key = smart and smart.warfare_spot
+        if key and smart.warfare_hint and pda_icons[key] then
+            level.map_change_spot_hint(smart.id, pda_icons[key], smart_hint(smart, smart.warfare_hint))
+        end
+    end
+end
+
 -- displays warfare's icon for the smart terrain
 -- controls smart terrain icons only, not squad dots
 --function smart_terrain.se_smart_terrain.show(self)
@@ -4267,8 +4334,6 @@ function smart_terrain.se_smart_terrain:show()
                 --]]
 
                 if (visible) then
-                    local info = get_warfare_info(self)
-
                     -- always show the natural faction icon; the under-attack state is shown
                     -- by a coloured outline reconciled at the end of show()
                     local display_key = faction
@@ -4277,14 +4342,12 @@ function smart_terrain.se_smart_terrain:show()
                     if (self.warfare_spot) then
                         if (self.warfare_spot ~= display_key) then            -- smart owner doesn't match icon of the owner
                             level.map_remove_object_spot(self.id, pda_icons[self.warfare_spot])
-                            level.map_add_object_spot(self.id, pda_icons[display_key], info)        -- update smart icon
-                            self.warfare_spot = display_key
+                            add_smart_spot(self, display_key, "info")        -- update smart icon
                         else
-                            level.map_change_spot_hint(self.id, pda_icons[display_key], info)
+                            update_smart_hint(self, display_key, "info")
                         end
                     else
-                        level.map_add_object_spot(self.id, pda_icons[display_key], info)        -- if no spot already, add it
-                        self.warfare_spot = display_key
+                        add_smart_spot(self, display_key, "info")        -- if no spot already, add it
                     end
 
                     -- debug: draw invasion_source marker as a second overlay on top of the normal icon
@@ -4301,7 +4364,6 @@ function smart_terrain.se_smart_terrain:show()
                 else
                 -- not visible based on actor and friendly squad view distances
                     if (not self.actor_target) then
-                        local info = get_unknown_info(self)
                         -- 'unknown' disc, or the greyed last-observed owner when memory holds one
                         local display_key = stale_spot_key(self)
 
@@ -4319,10 +4381,9 @@ function smart_terrain.se_smart_terrain:show()
                             else
                                 if (self.warfare_spot ~= display_key) then
                                     level.map_remove_object_spot(self.id, pda_icons[self.warfare_spot])
-                                    level.map_add_object_spot(self.id, pda_icons[display_key], info)
-                                    self.warfare_spot = display_key
+                                    add_smart_spot(self, display_key, "unknown")
                                 else
-                                    level.map_change_spot_hint(self.id, pda_icons[display_key], info)
+                                    update_smart_hint(self, display_key, "unknown")
                                 end
                             end
 
@@ -4334,13 +4395,11 @@ function smart_terrain.se_smart_terrain:show()
                                 if (warfare_options.options.hide_lair_smarts) then
                                     -- smart is a valuable nonvisible terrain: add 'unknown' spot
                                     if (self.props.base + self.props.resource + self.props.territory > 0) then
-                                        level.map_add_object_spot(self.id, pda_icons[display_key], info)
-                                        self.warfare_spot = display_key
+                                        add_smart_spot(self, display_key, "unknown")
                                     end
                                 -- not using either option, so need to add 'unknown' spots to all smarts
                                 else
-                                    level.map_add_object_spot(self.id, pda_icons[display_key], info)
-                                    self.warfare_spot = display_key
+                                    add_smart_spot(self, display_key, "unknown")
                                 end
                             end
                         end
@@ -4431,8 +4490,6 @@ function smart_terrain.se_smart_terrain:show()
             end
 
             if not (self.actor_target) then
-                local info = get_warfare_info(self)
-
                 -- always show the natural faction icon; the under-attack state is shown
                 -- by a coloured outline reconciled at the end of show()
                 local display_key = faction
@@ -4452,10 +4509,9 @@ function smart_terrain.se_smart_terrain:show()
                         -- update icon with correct visual and info
                         if (self.warfare_spot ~= display_key) then
                             level.map_remove_object_spot(self.id, pda_icons[self.warfare_spot])
-                            level.map_add_object_spot(self.id, pda_icons[display_key], info)
-                            self.warfare_spot = display_key
+                            add_smart_spot(self, display_key, "info")
                         else
-                            level.map_change_spot_hint(self.id, pda_icons[display_key], info)
+                            update_smart_hint(self, display_key, "info")
                         end
                     end
 
@@ -4467,13 +4523,11 @@ function smart_terrain.se_smart_terrain:show()
                         if (warfare_options.options.hide_lair_smarts) then
                             -- smart is a valuable nonvisible but occupied terrain: add faction spot
                             if (self.props.base + self.props.resource + self.props.territory > 0) or (faction ~= "none") then
-                                level.map_add_object_spot(self.id, pda_icons[display_key], info)
-                                self.warfare_spot = display_key
+                                add_smart_spot(self, display_key, "info")
                             end
                         -- not using either option, so need to add faction spots to all smarts
                         else
-                            level.map_add_object_spot(self.id, pda_icons[display_key], info)
-                            self.warfare_spot = display_key
+                            add_smart_spot(self, display_key, "info")
                         end
                     end
                 end
@@ -6201,10 +6255,22 @@ end
 ------------------------------------------------------------
 -- Callbacks
 ------------------------------------------------------------
+local pda_was_open = false
+
+-- show() skips hint text while the PDA is closed, so every hint is rewritten once as it opens
+local function watch_pda()
+    local open = sim_squad_warfare.is_pda_open()
+    if open and not pda_was_open then
+        refresh_smart_hints()
+    end
+    pda_was_open = open
+end
+
 function on_game_start()
     warfare_log.info("smart_terrain_warfare.on_game_start")
     refresh_strings()
 
     RegisterScriptCallback("on_localization_change",refresh_strings)
     RegisterScriptCallback("actor_on_update", reset_intel_memo)
+    RegisterScriptCallback("actor_on_update", watch_pda)
 end

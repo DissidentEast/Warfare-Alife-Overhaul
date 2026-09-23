@@ -730,7 +730,7 @@ function get_squad_info(squad, full_detail, show_target)
     return props
 end
 
-function is_pda_open()
+local function read_pda_open()
     local pda_menu = ActorMenu.get_pda_menu()
     if pda_menu and pda_menu:IsShown() then
         return true
@@ -739,6 +739,20 @@ function is_pda_open()
         return true
     end
     return false
+end
+
+-- PDA state changes between frames, so it is read once per frame (warfare.frame_clock.n).
+local pda_open_frame, pda_open = nil, false
+function is_pda_open()
+    if not (db.actor) then
+        return read_pda_open()
+    end
+    local n = warfare.frame_clock.n
+    if n ~= pda_open_frame then
+        pda_open_frame = n
+        pda_open = read_pda_open()
+    end
+    return pda_open
 end
 
 function get_enemy_info(squad)

@@ -91,6 +91,11 @@ local skirmish_incidental = {} -- [pair_key] = true while the pair's combat lock
 local skirmish_wary = {}       -- [squad_id] = CTime the squad lost a member in a skirmish
 local power_epoch = 0          -- bumped every try_coordinator firing (UPDATE_TIME); ages out squad.wf_member_power
 
+-- [squad_id] = x / z of an offline squad as of its own last squad_on_update (the engine moves a
+-- squad in its own update, before that callback). Scans skip a pair only when this says it is out
+-- of range; anything else goes through validate_enemy with live data. No entry = no skip.
+local last_x, last_z = {}, {}
+
 local c_cnt, c_tbl = 0, {} -- enemies collector
 local tbl_smart = {}
 local old_state, new_state
@@ -291,10 +296,18 @@ local function smart_terrain_on_update(smart)
 
                     -- Otherwise, scan for squads in the same map
                     local pos_1 = squad_1.position
+                    local x1, z1 = pos_1.x, pos_1.z
                     for j, id_2 in pairs(tbl_smart) do
-                        in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
-                        if in_combat then
-                            return
+                        local x2 = last_x[id_2]
+                        local dx, dz = 0, 0
+                        if x2 then
+                            dx, dz = x2 - x1, last_z[id_2] - z1
+                        end
+                        if (dx * dx + dz * dz < opt_dist) then
+                            in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
+                            if in_combat then
+                                return
+                            end
                         end
                     end
                 end
@@ -313,18 +326,22 @@ local function squad_on_update(squad_1)
         return
     end
 
+    local id_1 = squad_1.id
     if (squad_1.online) then
+        last_x[id_1], last_z[id_1] = nil, nil
         return
     end
+    local pos_1 = squad_1.position
+    local x1, z1 = pos_1.x, pos_1.z
+    last_x[id_1], last_z[id_1] = x1, z1
 
     -- Make sure squad exists within the simboard, and npc counts are greater than 0
-    if not (SIMBOARD.squads[squad_1.id] and (squad_1:npc_count() > 0)) then
+    if not (SIMBOARD.squads[id_1] and (squad_1:npc_count() > 0)) then
         return
     end
 
     local sim = alife()
     local community_1 = squad_1:get_squad_community()
-    local id_1 = squad_1.id
     local lid_1 = game_graph():vertex(squad_1.m_game_vertex_id):level_id()
     local in_combat
     local section = squad_1 and squad_1:section_name()
@@ -367,11 +384,17 @@ local function squad_on_update(squad_1)
             end
 
             -- Otherwise, scan for squads in the same map
-            local pos_1 = squad_1.position
             for id_2, _ in pairs(squads_by_level[lid_1]) do
-                in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
-                if in_combat then
-                    return
+                local x2 = last_x[id_2]
+                local dx, dz = 0, 0
+                if x2 then
+                    dx, dz = x2 - x1, last_z[id_2] - z1
+                end
+                if (dx * dx + dz * dz < opt_dist) then
+                    in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
+                    if in_combat then
+                        return
+                    end
                 end
             end
         end
@@ -623,6 +646,12 @@ local function coordinator()
     local sim = alife()
     local gg = game_graph()
     empty_table(squads_by_level)
+
+    for id in pairs(last_x) do
+        if not (SIMBOARD.squads[id]) then
+            last_x[id], last_z[id] = nil, nil
+        end
+    end
 
     -- Get rid of non-existing task squads cache
     for id, v in pairs(task_squads) do
@@ -1197,6 +1226,7 @@ function remove_squad_info(squad_2, id_2, id_1, lid)
     if squads_by_level[lid] then
         squads_by_level[lid][id_2] = nil
     end
+    last_x[id_2], last_z[id_2] = nil, nil
 
 end
 

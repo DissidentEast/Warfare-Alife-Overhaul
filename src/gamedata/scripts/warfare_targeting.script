@@ -178,6 +178,8 @@ function find_candidates(smart, faction, eligible, opts)
             cross_level: also consider directly linked levels; false = this level only.
                          Never widens past the neighbourhood, whatever the faction's
                          linked_level_targeting says -- see get_linked_smart_collection
+            bases_only: walk only the bases of the same pool, in the same order; for
+                        predicates that reject every non-base anyway
             min_score: discard candidates scoring at or below this (nil = keep all)
             ctx: shared per-call state handed to the predicate
     Returns:
@@ -191,7 +193,13 @@ function find_candidates(smart, faction, eligible, opts)
 
     local collection
     if (opts.cross_level) then
-        collection = smart_terrain_warfare.get_linked_smart_collection(smart.level_id)
+        if (opts.bases_only) then
+            collection = smart_terrain_warfare.get_linked_base_collection(smart.level_id)
+        else
+            collection = smart_terrain_warfare.get_linked_smart_collection(smart.level_id)
+        end
+    elseif (opts.bases_only) then
+        collection = smart_terrain_warfare.get_level_base_collection(smart.level_id)
     else
         local level_info = warfare_levels.level_information[smart.level_id]
         collection = level_info and level_info.smarts
@@ -258,7 +266,7 @@ function find_candidates(smart, faction, eligible, opts)
 end
 
 
-function find_rest_targets(smart, faction, cross_level)
+function find_rest_targets(smart, faction, cross_level, incoming)
 --[[
     Bases this faction can garrison a displaced squad at, best first.
 
@@ -273,10 +281,13 @@ function find_rest_targets(smart, faction, cross_level)
     whose base_priority is zero or negative must still be able to reach its own bases.
     Ordering by score instead of raw distance means a squad prefers levels its faction
     actually wants to hold, which plain distance could not express.
+
+    incoming: optional build_incoming_map(faction) result the caller already has.
 ]]
     return find_candidates(smart, faction, is_rest_target, {
         cross_level = cross_level,
-        ctx = { incoming = smart_terrain_warfare.build_incoming_map(faction) },
+        bases_only = true,
+        ctx = { incoming = incoming or smart_terrain_warfare.build_incoming_map(faction) },
     })
 end
 

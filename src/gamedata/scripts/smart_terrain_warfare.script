@@ -5786,7 +5786,7 @@ function find_targets(smart)
 
     local level = smart.level_id
     local faction = smart.owning_faction or "none"
-    local d = (smart.defense_power or 0) * get_max_power_mult(smart)
+    local d = smart.defense_power or 0      -- check_owner already applied get_max_power_mult
 
     if (faction == "monster") then
         return {}

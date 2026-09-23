@@ -407,13 +407,17 @@ local function warfare_show(self)
 
             if not (visible) then
                 if (sim_offline_combat.squads_by_level[levelID]) then
+                    local self_pos = self.position
+                    local px, pz = self_pos.x, self_pos.z
                     for squadID, _ in pairs(sim_offline_combat.squads_by_level[levelID]) do
                         local squad = squadID and alife_object(squadID)
 
                         if (squad and squad:clsid() == clsid.online_offline_group_s) then
                             -- squad-to-squad sight is own-faction only; allies reveal outposts, not squads
                             if (squad:get_squad_community() == warfare.actor_faction) then
-                                if (warfare.distance_to_xz_sqr(squad.position, self.position) < range_sqr) then
+                                local sp = squad.position
+                                local dx, dz = px - sp.x, pz - sp.z
+                                if (dx * dx + dz * dz < range_sqr) then
                                     visible = true
                                     break
                                 end

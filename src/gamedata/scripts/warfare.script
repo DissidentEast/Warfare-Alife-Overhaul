@@ -102,12 +102,15 @@ end
 --
 -- Game time only moves between frames, or inside one through level.change_game_time, so the frame
 -- value is cleared on actor_on_update (every frame) and by the change_game_time wrapper in
--- warfare_monkeypatches. Without an actor nothing clears it, so reads go to the engine.
-local frame_time = nil
+-- warfare_monkeypatches, and when the actor goes away. Without an actor reads go to the engine.
+--
+-- frame_clock.t: the frame value once something has read it this frame, else nil. Hot modules may
+-- read it directly (falling back to get_time_ref); it follows get_time_ref's read-only contract.
+frame_clock = { t = nil }
 local frame_h, frame_m, frame_s = nil, nil, nil
 
 function reset_frame_clock()
-    frame_time = nil
+    frame_clock.t = nil
     frame_h = nil
 end
 
@@ -115,10 +118,10 @@ function get_time_ref()
     if not db.actor then
         return game.get_game_time()
     end
-    local t = frame_time
+    local t = frame_clock.t
     if t == nil then
         t = game.get_game_time()
-        frame_time = t
+        frame_clock.t = t
     end
     return t
 end
@@ -1477,6 +1480,7 @@ function on_game_start()
     RegisterScriptCallback("smart_terrain_on_update", smart_terrain_warfare.smart_terrain_on_update)
     RegisterScriptCallback("squad_on_update", sim_squad_warfare.squad_on_update)
     RegisterScriptCallback("actor_on_update", reset_frame_clock)
+    RegisterScriptCallback("actor_on_net_destroy", reset_frame_clock)
     RegisterScriptCallback("actor_on_update", actor_on_update)
     RegisterScriptCallback("save_state", save_state)
     RegisterScriptCallback("squad_on_npc_death", sim_squad_warfare.squad_on_npc_death)
@@ -1503,7 +1507,8 @@ end
 
 
 function distance_to_xz_sqr(a, b)
-    return math.pow(b.x - a.x, 2) + math.pow(b.z - a.z, 2)
+    local dx, dz = b.x - a.x, b.z - a.z
+    return dx * dx + dz * dz
 end
 
 function is_warfare_trader(npc)

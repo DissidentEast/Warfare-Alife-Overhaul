@@ -68,6 +68,11 @@ local smart_battles_only
 local ini_ocs
 local is_enemy, string_find, math_random, math_ceil, math_max = game_relations.is_factions_enemies, string.find, math.random, math.ceil, math.max
 
+local function distance_to_xz_sqr(a, b)
+    local dx, dz = b.x - a.x, b.z - a.z
+    return dx * dx + dz * dz
+end
+
 -- Ignore list
 task_squads = {}
 local task_giver_squads = {}
@@ -512,6 +517,7 @@ function calculate_distance_combat_multiplier(pos, community)
     local curves = build_curves(opts, min_multiplier)
 
     local best_multiplier = 0
+    local px, pz = pos.x, pos.z
 
     -- Only the smarts this faction owns, from the epoch-keyed index
     local ids = owned_smart_ids(community)
@@ -522,8 +528,8 @@ function calculate_distance_combat_multiplier(pos, community)
         local smart_pos = props and (smart.global_position or global_position.from(smart))
 
         if smart_pos then
-            -- Calculate distance using the existing warfare system function
-            local distance = math.sqrt(math.max(1, warfare.distance_to_xz_sqr(smart_pos, pos)))
+            local dx, dz = px - smart_pos.x, pz - smart_pos.z
+            local distance = math.sqrt(math.max(1, dx * dx + dz * dz))
             local curve = curve_for(curves, props)
 
             -- Only smarts within range contribute.
@@ -854,8 +860,9 @@ function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1, pos_1)
     end
 
     -- Only simulate for close squads
-    local d = distance_to_xz_sqr(pos_1 or squad_1.position, squad_2.position)
-    if (d >= opt_dist) then
+    local p1, p2 = pos_1 or squad_1.position, squad_2.position
+    local dx, dz = p2.x - p1.x, p2.z - p1.z
+    if (dx * dx + dz * dz >= opt_dist) then
         return false
     end
 
@@ -1275,11 +1282,6 @@ function get_random_npc(squad)
         return nil
     end
     return squad_npcs[math_random(#squad_npcs)]
-end
-
-function distance_to_xz_sqr(a, b)
-    local dx, dz = b.x - a.x, b.z - a.z
-    return dx * dx + dz * dz
 end
 
 function get_num_squads_on_level(lvl, faction, mode)

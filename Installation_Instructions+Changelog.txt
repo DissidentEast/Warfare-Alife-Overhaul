@@ -1,5 +1,5 @@
 Warfare Alife Overhaul
-version: 1.6.7
+version: 1.6.8
 by Vintar - GAMMA patch and continued development by Erepb/SaloEater
 
 for Anomaly 1.5.3, including GAMMA (use the Gamma Patch in the installer)
@@ -9,14 +9,14 @@ To install via Mod Organizer:
 
 1. Import the WarfareALifeOverhaul.zip file into Mod Organizer
 2. Follow the installer, selecting any optionals and patches necessary. Check that your load order has WarfareALifeOverhaul overwriting any addons you selected patches for.
-3. On GAMMA, select the 'Gamma Patch' module together with the 'ZCP' and 'LTTZ' patches - GAMMA ships both of those addons. The 'Alternative New Levels Layout' patch is optional and requires the New Levels addon.
+3. On GAMMA, select the 'Gamma Patch' module together with the 'LTTZ' patch - GAMMA ships that addon. ZCP needs no patch: Warfare detects ZCP 1.4 and 1.5 and applies compatibility itself. The 'Alternative New Levels Layout' patch is optional and requires the New Levels addon.
 4. Load the 'Alife Overhaul - Balanced' preset: Options > Alife > Warfare, then pick it from the preset dropdown at the top right of the screen. It is the one preset this addon ships and is kept current with its balance changes. Apply a preset BEFORE starting a new game, otherwise respawn timer changes will not take place until the next respawn occurs.
 
 
 To install manually:
 1. Drop the 'gamedata' folder found inside 'src' into your Anomaly root directory (merge it with your existing 'gamedata' folder).
 2. Install any optionals desired - every folder under 'optionals' holds its own 'gamedata' folder, merged the same way.
-3. Install any patches that are needed, from the 'patches' folder, the same way. On GAMMA that means 'GAMMA Warfare Patch', 'ZCP' and 'Patch for LTTZ Directors Cut'.
+3. Install any patches that are needed, from the 'patches' folder, the same way. On GAMMA that means 'GAMMA Warfare Patch' and 'Patch for LTTZ Directors Cut'.
 4. Load the 'Alife Overhaul - Balanced' preset: Options > Alife > Warfare, then pick it from the preset dropdown at the top right of the screen. It is the one preset this addon ships and is kept current with its balance changes. Apply a preset BEFORE starting a new game, otherwise respawn timer changes will not take place until the next respawn occurs.
 
 NOTE: The fomod folder is not used if you do not use Mod Organizer, or are installing this addon manually.
@@ -36,6 +36,7 @@ This addon is compatible with existing Anomaly 1.5.3 Warfare save files, and has
 Version Log:
 
 
+1.6.8 - New Blind option in the Map settings: the map shows only what you see yourself and what your PDA reveals, while squads, outposts and garrisons report nothing, your own faction included. It overrides fog of war, remembered owners still work from your own sightings, and a new game starts with every base unknown. A new game offers to simulate the Zone for up to 20 days before you start. ZCP compatibility is now applied automatically for ZCP 1.4 and 1.5 and the separate ZCP patch is gone; ZCP can also choose Warfare's mutant spawns behind a new setting. Offline fights between mutants and humans are decided by species relations. With ReDone Collection installed, main bases move to where it puts faction traders. In story mode Warfare squads stay off smarts locked by quests. Loners and ecologists rest as guests on bases of factions they are not at war with. A performance pass makes targeting, offline combat, fog of war and the simulation tick much cheaper on busy saves. Fixed Warfare's squad sizing never running, mutant lairs re-sending the squad already there, a crash in patrol attack rolls on a squad that no longer exists, a base's own defence counting the distance power multiplier twice, and protected main bases passing to friendly factions. The new-game tooltips no longer call story mode incompatible with Warfare.
 1.6.7 - Faction relations now have an on/off switch in the Faction Relations settings: turn it off if another addon manages relations, and Warfare stops moving faction standings and takes its arrows, hover breakdown and daily-limit footer off the PDA Relations tab. Works with the Show All Faction Relations in PDA addon: Warfare no longer draws its own matrix over it and instead adds its arrows and footer to that addon's grid. Added an All Out War preset. The value of a kill and value of a capture sliders go up to 200. Fixed all-out war resetting every faction to -2000 again on every load instead of once per game, and fixed the important documents dialog breaking with traders outside the eight main factions, such as the Barman.
 1.6.6 - Squads that merely cross paths now skirmish instead of fighting to the death: the fight ends at the first death, both squads move on, and the squad that lost a man avoids skirmishes for three in-game hours. Deliberate hunts and assaults still fight in full. Whether a chance meeting turns into a skirmish uses the average of both factions' hunt chance. Reworked how Warfare shows squads on the map so it no longer conflicts with other PDA addons. Balanced preset retuned: patrols rest longer, random patrols stay out longer, Monolith runs random patrols, Renegades are slightly weaker. Fixed the settings page jumping to the top when a section is toggled.
 1.6.5 - Fixed the game crashing shortly after loading with the New Levels addon installed. Warfare now picks up the maps that New Levels adds and runs the war on them like everywhere else, and it no longer removes squads from those maps when a save is loaded. On a new game the added maps start with nobody in charge and get claimed as factions send squads there.

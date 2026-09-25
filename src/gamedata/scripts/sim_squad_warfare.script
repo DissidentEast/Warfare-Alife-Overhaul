@@ -384,11 +384,12 @@ local function warfare_show(self)
             end
         end
 
-        if (warfare_options.options.fog_of_war) then
+        if smart_terrain_warfare.fog_active() then
             local range_sqr = smart_terrain_warfare.fog_radius_sqr(false)
 
             local levelID = self.m_game_vertex_id and game_graph():vertex(self.m_game_vertex_id):level_id()
             local visible = false
+            local blind = smart_terrain_warfare.actor_blind()
 
             if (levelID == get_player_level_id()) then
                 local dist = warfare.distance_to_xz_sqr(self.position, alife():actor().position)
@@ -407,7 +408,7 @@ local function warfare_show(self)
                 end
             end
 
-            if not (visible) then
+            if not (visible or blind) then
                 if (sim_offline_combat.squads_by_level[levelID]) then
                     local self_pos = self.position
                     local px, pz = self_pos.x, self_pos.z
@@ -430,7 +431,7 @@ local function warfare_show(self)
             end
 
             -- own outposts watch their surroundings; like squads, they do not pass squad sightings to allies
-            if not (visible) and levelID then
+            if not (visible or blind) and levelID then
                 visible = smart_terrain_warfare.seen_by_outpost(levelID, self.position, false)
             end
 

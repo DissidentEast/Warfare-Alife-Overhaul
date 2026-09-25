@@ -1148,7 +1148,8 @@ function fill_start_position()
             -- their owner (greyed) from the first PDA open. One CTime per record: marshal
             -- mis-resolves a userdata shared between tables (lmarshal.c SEEN index order)
             if smart.props and smart.props.base > 0
-            and (warfare_options.options.all_out_war or not COVERT_BASES[best]) then
+            and (warfare_options.options.all_out_war or not COVERT_BASES[best])
+            and not smart_terrain_warfare.actor_blind() then
                 smart_terrain_warfare.last_seen[id] = { owner = best, at = get_time() }
                 known = known + 1
             end

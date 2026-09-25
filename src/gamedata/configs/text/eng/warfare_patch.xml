@@ -669,6 +669,12 @@
 	<string id="ui_mm_alife_warfare_general_fog_of_war_memory_desc">
 		<text>With fog of war on, a smart terrain that drops out of sight keeps showing the owner you last observed there, drawn in grey. Its hover text names that owner and how old the observation is. Only what you or your allies actually saw is remembered; a place you have never seen stays unknown.</text>
 	</string>
+	<string id="ui_mm_alife_warfare_general_fog_of_war_blind">
+		<text>Blind: the map shows only what you see</text>
+	</string>
+	<string id="ui_mm_alife_warfare_general_fog_of_war_blind_desc">
+		<text>Cuts you off from the intel network. The map shows only what is within your own sight range and what your PDA reveals; squads, outposts and garrisons report nothing, your own faction included. Overrides fog of war: the fog view applies even with fog of war switched off. Remembering the last observed owner still works, from your own sightings only. A new game starts with every base unknown.</text>
+	</string>
 	<string id="ui_mm_alife_warfare_sec_relations">
 		<text>Faction Relations</text>
 	</string>

@@ -4108,6 +4108,17 @@ function actor_shares_intel(faction)
     return v
 end
 
+-- Blind: the map takes nothing from the intel network, only the actor's own range and PDA device.
+function actor_blind()
+    return warfare_options.options.fog_of_war_blind
+end
+
+-- Fog view is on: fog of war, or blind, which overrides it.
+function fog_active()
+    local o = warfare_options.options
+    return o.fog_of_war or o.fog_of_war_blind
+end
+
 -- Smart server objects per level, resolved once from level_information. Rebuilt when
 -- level_information swaps in a new smarts table.
 local level_smart_objs = {}
@@ -4230,9 +4241,10 @@ function smart_terrain.se_smart_terrain:show()
 
     if IsWarfare() then
         -- fog of war
-        if (warfare_options.options.fog_of_war) then
+        if fog_active() then
             local lvl = game_graph():vertex(self.m_game_vertex_id):level_id()
             local visible = false
+            local blind = actor_blind()
 
             if (sim_offline_combat.squads_by_level[lvl] ~= nil) then
                 local range_sqr = fog_radius_sqr(true)
@@ -4246,7 +4258,7 @@ function smart_terrain.se_smart_terrain:show()
                 end
 
                 -- determine visibility granted by allied squads
-                if not (visible) then
+                if not (visible or blind) then
                     local self_pos = self.position
                     local px, pz = self_pos.x, self_pos.z
                     for squadID,_ in pairs(sim_offline_combat.squads_by_level[lvl]) do
@@ -4272,7 +4284,7 @@ function smart_terrain.se_smart_terrain:show()
                 end
 
                 -- determine visibility granted by own and allied outposts
-                if not (visible) then
+                if not (visible or blind) then
                     visible = seen_by_outpost(lvl, self.position, true)
                 end
 
@@ -4296,7 +4308,7 @@ function smart_terrain.se_smart_terrain:show()
                         else
                             -- update color: red=under attack, orange=squads ready, cyan=gathering squads
                             local faction_key = other.owning_faction or "none"
-                            local new_key = get_target_circle_key(t, self.id, actor_faction, faction_key)
+                            local new_key = (not blind) and get_target_circle_key(t, self.id, actor_faction, faction_key)
                             if new_key then
                                 set_target_circle(t, spot, new_key, get_warfare_info(other, false))
                                 self.target_spots[t] = new_key
@@ -4312,7 +4324,7 @@ function smart_terrain.se_smart_terrain:show()
 
                 -- smart belongs to player's faction — show target spots only for invasion targets
                 -- cyan=gathering squads, orange=squads ready, red=under attack
-                if (actor_faction) then
+                if (actor_faction) and not blind then
                     local inv = invasions[self.id]
                     local inv_target = inv and inv[1]
                     if inv_target then
@@ -4331,7 +4343,7 @@ function smart_terrain.se_smart_terrain:show()
                 end
 
                 -- non-player neutral factions: show orange/red when invasion forces are gathered and base is visible
-                if not actor_faction and not enemies and visible then
+                if not actor_faction and not enemies and visible and not blind then
                     local inv = invasions[self.id]
                     local inv_target = inv and inv[1]
                     local inv_ready = inv and inv[3]
@@ -4349,7 +4361,7 @@ function smart_terrain.se_smart_terrain:show()
                 end
 
                 -- an outpost reports itself at any distance when its faction shares intel with the actor's
-                if actor_shares_intel(faction) then
+                if not blind and actor_shares_intel(faction) then
                     visible = true
                 end
 
@@ -5018,7 +5030,7 @@ function get_warfare_info(smart, visible)
                     local att_faction = other.owning_faction
                     local att_eligible = is_invasion_attacker_eligible(att_faction, inv[3])
                     if att_eligible then
-                        if not warfare_options.options.fog_of_war or spot_is_live(other) then
+                        if not fog_active() or spot_is_live(other) then
                             local attacker_name = translate_smart_name(other:name()) or other:name()
                             props = props .. " \\n" .. clr_b .. " \\n" .. str_wrfr[18]
                             props = props .. " \\n" .. clr_gr .. str_wrfr[21] .. ": " .. clr_w .. attacker_name .. "\\n"
@@ -5301,7 +5313,7 @@ local function announce_owner_change(smart, was)
         sim_offline_combat.on_smart_owner_changed(was, smart.owning_faction)
         -- the garrison reports its own loss; the memory record is refreshed without line of sight
         -- so the map does not keep claiming the smart
-        if was == warfare.actor_faction then
+        if was == warfare.actor_faction and not actor_blind() then
             remember_owner(smart.id, smart.owning_faction)
         end
     end

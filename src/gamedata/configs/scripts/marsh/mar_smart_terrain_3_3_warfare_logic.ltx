@@ -1,0 +1,92 @@
+; Warfare-spawned trader (sim_default_<faction>_trader) of whoever holds the smart.
+; The trade value is replaced by the faction stock in warfare_monkeypatches configure_schemes.
+[logic@mar_smart_terrain_3_3_warfare_trader]
+suitable = {=check_npc_trader} true
+trade = items\trade\trade_renegade.ltx
+prior = 200
+active = beh@mar_smart_terrain_3_3_warfare_trader
+can_select_weapon = {=is_warfare} true, false
+dont_keep_items = true
+level_spot = trader
+
+; Warfare-spawned mechanic, standing at the vice created by warfare_base_props.script.
+[logic@mar_smart_terrain_3_3_warfare_mechanic]
+suitable = {=check_npc_mechanic} true
+trade = items\trade\trade_generic_mechanic.ltx
+prior = 200
+active = beh@mar_smart_terrain_3_3_warfare_mechanic
+can_select_weapon = {=is_warfare} true, false
+dont_keep_items = true
+level_spot = mechanic
+
+; Warfare-spawned barman, behind the barrel counter created by warfare_base_props.script, whose
+; restrictor keeps NPCs from pathing through the barrels.
+[logic@mar_smart_terrain_3_3_warfare_barman]
+suitable = {=check_npc_barman} true
+trade = items\trade\trade_generic_barman.ltx
+prior = 200
+active = beh@mar_smart_terrain_3_3_warfare_barman
+can_select_weapon = {=is_warfare} true, false
+dont_keep_items = true
+level_spot = barman
+
+; Warfare-spawned medic, sitting on the chair created by warfare_base_props.script. The seat is off the
+; AI graph: he walks to the nearest cell (pos), and the animation is placed on the seat (animpoint).
+; warfare_job_anchors keeps beh from standing him up there (its anchor seat).
+[logic@mar_smart_terrain_3_3_warfare_medic]
+suitable = {=check_npc_medic} true
+trade = items\trade\trade_generic_medic.ltx
+prior = 200
+active = beh@mar_smart_terrain_3_3_warfare_medic
+can_select_weapon = {=is_warfare} true, false
+dont_keep_items = true
+level_spot = medic
+
+[beh@general]
+behavior_state = beh_move
+target = waypoint
+walk_dist = 100
+jog_dist = 220
+wait_anim = guard
+walk_anim = patrol
+jog_anim = patrol
+run_anim = rush
+delay_anim = guard
+meet = meet
+combat_ignore_cond = {=is_warfare} false, {=actor_true_enemy =check_enemy_name(actor)} false, true
+combat_ignore_keep_when_attacked = {=is_warfare} false, true
+invulnerable = {=is_warfare} false, {!actor_true_enemy} true, false
+gather_items_enabled = false
+help_wounded_enabled = false
+corpse_detection_enabled = false
+
+[beh@mar_smart_terrain_3_3_warfare_trader]:beh@general
+pt1 = 10000,guard | pos:-166.64094543457,1.2142474651337,404.41220092773 look:-186.41499328613,1.2142474651337,407.69491577148
+path_end = loop
+
+[beh@mar_smart_terrain_3_3_warfare_mechanic]:beh@general
+pt1 = 10000,guard | pos:-202.38124084473,0.66409063339233,402.19967651367 look:-204.79956054688,0.66409063339233,404.15991210938
+path_end = loop
+
+[beh@mar_smart_terrain_3_3_warfare_barman]:beh@general
+pt1 = 10000,guard | pos:-173.29501342773,1.3311669826508,411.64044189453 look:-173.68822956083,1.3311669826508,409.67970329853
+path_end = loop
+
+; The wait never runs out: a loop back to pt1 would stand him up and re-sit him where he stands.
+[beh@mar_smart_terrain_3_3_warfare_medic]:beh@general
+pt1 = 1000000000,animpoint_sit_normal | pos:-171.49998474121,2.507292509079,416.5 animpoint:-171.78917,2.4886870384216,416.2124,0.09218954274503,0,-0.99574147659343
+path_end = loop
+
+[meet]
+close_anim      = nil
+close_victim    = nil
+far_anim        = nil
+far_victim      = nil
+close_distance  = 0
+far_distance    = 0
+close_snd_distance = 3
+abuse           = false
+use = {=actor_enemy} false, true
+allow_break = false
+meet_on_talking = false
+trade_enable = false

@@ -161,6 +161,47 @@ function get_real_seconds_until_spawn(timer, interval)
     return real + effective_remaining
 end
 
+-- Nearest AI-grid vertex to pos on the actor's current level, or nil within ~3.5 m. A prop or bed
+-- usually stands in a hole of the AI mesh, so the cell right under it often does not exist.
+local INVALID_LVID = 4294967295
+local AI_CELL = 0.7
+local MAX_RING = 5
+
+function nearest_lvid(pos)
+    local best, best_dist
+    for ring = 0, MAX_RING do
+        for dx = -ring, ring do
+            for dz = -ring, ring do
+                if math.max(math.abs(dx), math.abs(dz)) == ring then
+                    local p = vector():set(pos.x + dx * AI_CELL, pos.y, pos.z + dz * AI_CELL)
+                    local id = level.vertex_id(p)
+                    if id and id < INVALID_LVID then
+                        local dist = dx * dx + dz * dz
+                        if not best_dist or dist < best_dist then
+                            best, best_dist = id, dist
+                        end
+                    end
+                end
+            end
+        end
+        if best then
+            return best
+        end
+    end
+end
+
+--- The smart, if it exists and is on the actor's current level.
+function smart_on_actor_level(smart_name)
+    local smart = SIMBOARD.smarts_by_names[smart_name]
+    if not smart then
+        return
+    end
+    local gg = game_graph()
+    if gg:vertex(smart.m_game_vertex_id):level_id() == gg:vertex(db.actor:game_vertex_id()):level_id() then
+        return smart
+    end
+end
+
 --We need this class to allocate memory for string constants only once per whole loop
 class "CheckUniqueSquad"
 function CheckUniqueSquad:__init(faction)

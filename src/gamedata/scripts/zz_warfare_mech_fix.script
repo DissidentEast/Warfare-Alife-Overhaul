@@ -119,7 +119,7 @@ function physic_object_on_use_callback(obj, who)
 
     bind_awr.r_unused()
 
-    local smart = nearest_smart()
+    local smart = warfare_base_props.smart_of_vice(obj:id()) or nearest_smart()
     local faction = mechanic_faction(smart)
     local mechanic = MECHANIC_PREFIX .. faction .. MECHANIC_SUFFIX
 

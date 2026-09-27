@@ -1,0 +1,274 @@
+-- Static props Warfare adds to bases that have none in all.spawn (workbench, bar counter, medic corner,
+-- lamps). Each piece is created once, the first time the actor is on the smart's level, and its object
+-- id is kept in alife storage. A stored piece that is no longer listed is released; one whose listed
+-- pose or custom data changed is released and recreated. Every piece is pinned by a bone and ignores
+-- static geometry, so it can't be pushed and doesn't spam impact sounds.
+--
+-- AI paths ignore physics objects, so a smart's obstacle pieces are also fenced off by one default IN
+-- space restrictor (every NPC on the level stays out of it), listed as the smart's ai_blocker piece.
+--
+-- The vice's name (awr_tiski<id>) is what bind_awr and zz_warfare_mech_fix match on.
+
+local PHYSIC_OBJECT = "physic_object"
+local HANGING_LAMP = "lights_hanging_lamp"
+local SPACE_RESTRICTOR = "space_restrictor"
+local DEFAULT_IN_RESTRICTOR = 2
+
+-- Pinned bodies otherwise keep colliding with the floor they stand on.
+local COLLIDE_INI = "[collide]\nignore_static\n"
+
+-- Pinned bodies still yield to steady contact, so a table carrying pinned items sinks unless the two
+-- don't collide: items are small objects and the table ignores small objects.
+local TABLE_TOP_INI = "[collide]\nignore_static\nignore_small_objects\n"
+local TABLE_ITEM_INI = "[collide]\nignore_static\nsmall_object\n"
+
+-- Same as all.spawn's scripts\marsh\tiski_01.ltx once access is granted. Without [logic],
+-- bind_physic_object leaves the object unbound and it never gets a use callback.
+local VICE_INI = "[logic]\nactive = ph_idle@warfare_vice\n\n[ph_idle@warfare_vice]\ntips = st_tiski\n\n" .. COLLIDE_INI
+
+local TABLE  = [[dynamics\workshop_room\awr_stol_9a_mini]] -- 1.52 x 0.65, top 0.851 above its origin
+local BARREL = [[dynamics\balon\bochka_close_1]]
+-- A level vertex is blocked when a corner of its cell is inside. The barman's cell has no cells north
+-- of it, so this must stay below 0.28 to keep the two cells west of it open as his way in.
+local BARREL_RADIUS = 0.25
+local VODKA  = [[dynamics\devices\dev_vodka\dev_vodka]]
+
+-- Vanilla all.spawn light_wire_1 (bare bulb on a wire). flags 42 = cast shadow + R2 + point ambient.
+local WIRE_LAMP = {
+    visual_name = [[dynamics\light\light_wire_1_glass]],
+    main_color = 0xffffffff, main_brightness = 0.8, main_color_animator = [[light\light_omni_white_idle]],
+    main_range = 8, light_flags = 42, lamp_fixed_bones = "link", health = 100,
+    main_virtual_size = 0.1, ambient_radius = 2, ambient_power = 0.1, ambient_texture = "", main_texture = "",
+    main_bone = "bone_lamp", main_cone_angle = 2.094, glow_texture = "", glow_radius = 0.7, ambient_bone = "bone_omni",
+}
+
+-- smart name -> pieces. key names the piece in storage. pos is the model origin, heading in radians
+-- (engine getH convention), optional bank rolls the model about its forward axis.
+-- visual / fixed_bones override the section's own; ini is the custom data (default COLLIDE_INI).
+-- obstacle is the radius NPCs are kept away from its pos by.
+-- A lamp piece carries its hanging-lamp properties in lamp; pos is the ceiling point it hangs from.
+local pieces = {
+    ["mar_smart_terrain_3_3"] = {
+        -- Workbench: the Clear Sky base pair (mar_awr_stol_1 + mar_awr_tiski_01) rotated so the table's
+        -- working side faces the mechanic.
+        { key = "table", section = PHYSIC_OBJECT, visual = TABLE, fixed_bones = "link",
+          pos = { -205.03261, 0.60585, 404.34882 }, heading = 0.90970 },
+        { key = "vice", section = "awr_tiski", ini = VICE_INI,
+          pos = { -204.85197, 1.45720, 404.22124 }, heading = 5.62133 },
+
+        -- Bar: barrels (0.742 wide, 1.09 tall) in an L in front of and left of the barman's cell
+        -- (-173.6, 1.316, 411.6), props on top.
+        { key = "barrel_front_r", section = PHYSIC_OBJECT, visual = BARREL, fixed_bones = "barrel",
+          obstacle = BARREL_RADIUS, pos = { -174.46908, 1.3, 411.03993 }, heading = 2.94367 },
+        { key = "barrel_front_c", section = PHYSIC_OBJECT, visual = BARREL, fixed_bones = "barrel",
+          obstacle = BARREL_RADIUS, pos = { -173.74156, 1.3, 410.89403 }, heading = 2.94367 },
+        { key = "barrel_front_l", section = PHYSIC_OBJECT, visual = BARREL, fixed_bones = "barrel",
+          obstacle = BARREL_RADIUS, pos = { -173.01405, 1.3, 410.74813 }, heading = 2.94367 },
+        { key = "barrel_side", section = PHYSIC_OBJECT, visual = BARREL, fixed_bones = "barrel",
+          obstacle = BARREL_RADIUS, pos = { -172.86815, 1.3, 411.47565 }, heading = 2.94367 },
+        { key = "bar_plate", section = PHYSIC_OBJECT, visual = [[dynamics\kitchen_room\kitchen_tarelka1]],
+          fixed_bones = "link", pos = { -173.82, 2.39027, 410.90976 }, heading = 2.94367 },
+        { key = "bar_mug", section = PHYSIC_OBJECT, visual = [[dynamics\kitchen_room\kitchen_krujka]],
+          fixed_bones = "bone01", pos = { -173.53362, 2.39027, 411.01551 }, heading = 2.94367 },
+        { key = "bar_pot", section = PHYSIC_OBJECT, visual = [[dynamics\kitchen_room\kitchen_kastrula_up]],
+          fixed_bones = "link", pos = { -174.46908, 2.39027, 411.03993 }, heading = 2.94367 },
+        { key = "bar_bottles", section = PHYSIC_OBJECT, visual = [[dynamics\box\box_bottle_1]],
+          fixed_bones = "link", pos = { -172.86815, 2.39027, 411.47565 }, heading = 2.94367 },
+        -- vodka (0.066 wide, 0.27 tall) in the crate: staggered rows of 3 + 2, one corner left empty,
+        -- each turned differently
+        { key = "bar_vodka_1", section = PHYSIC_OBJECT, visual = VODKA, fixed_bones = "bone01",
+          pos = { -172.68377, 2.41027, 411.53047 }, heading = 3.34367 },
+        { key = "bar_vodka_2", section = PHYSIC_OBJECT, visual = VODKA, fixed_bones = "bone01",
+          pos = { -172.79946, 2.41027, 411.56387 }, heading = 4.84367 },
+        { key = "bar_vodka_3", section = PHYSIC_OBJECT, visual = VODKA, fixed_bones = "bone01",
+          pos = { -172.93282, 2.41027, 411.56001 }, heading = 2.14367 },
+        { key = "bar_vodka_4", section = PHYSIC_OBJECT, visual = VODKA, fixed_bones = "bone01",
+          pos = { -172.77603, 2.41027, 411.37558 }, heading = 5.64367 },
+        { key = "bar_vodka_5", section = PHYSIC_OBJECT, visual = VODKA, fixed_bones = "bone01",
+          pos = { -172.91723, 2.41027, 411.38350 }, heading = 4.04367 },
+
+        -- Medic corner. The chair faces his way (the model's front is its -z, so heading is his + pi) and
+        -- stands where the sit animation settles him, 0.5 m behind his animpoint. Moving it means moving
+        -- the animpoint (mar_smart_terrain_3_3_warfare_logic.ltx), the table and the seat in
+        -- warfare_job_anchors with it.
+        { key = "medic_chair", section = PHYSIC_OBJECT, visual = [[dynamics\stul\stul_wood_01]], fixed_bones = "link",
+          pos = { -171.74308, 2.48869, 415.71453 }, heading = 3.23391 },
+        -- turned like the workbench (table heading = the facing of whoever works at it), kept clear of his
+        -- seated body: characters collide with props
+        { key = "medic_table", section = PHYSIC_OBJECT, visual = TABLE, fixed_bones = "link", ini = TABLE_TOP_INI,
+          pos = { -171.83988, 2.43069, 416.76006 }, heading = 0.09232 },
+        -- on the table: medkit, bandage, stim on his left; kit on his right
+        { key = "medic_medkit", section = PHYSIC_OBJECT, visual = [[dynamics\devices\dev_aptechka\dev_aptechka_low]],
+          fixed_bones = "bone01", ini = TABLE_ITEM_INI, pos = { -172.39860, 3.2837, 416.82884 }, heading = 0.39232 },
+        { key = "medic_bandage", section = PHYSIC_OBJECT, visual = [[dynamics\devices\dev_bandage\dev_bandage]],
+          fixed_bones = "bone01", ini = TABLE_ITEM_INI, pos = { -172.17511, 3.2967, 416.90979 }, heading = -0.40768 },
+        { key = "medic_stim", section = PHYSIC_OBJECT, visual = [[dynamics\equipments\medical\stim1]],
+          fixed_bones = "bone01", ini = TABLE_ITEM_INI, pos = { -172.25072, 3.2977, 416.64168 }, heading = 1.29232 },
+        { key = "medic_kit", section = PHYSIC_OBJECT, visual = [[dynamics\equipments\medical\item_aptechka2]],
+          fixed_bones = "link", ini = TABLE_ITEM_INI, pos = { -171.30329, 3.2847, 416.93025 }, heading = -0.10768 },
+        -- 2 m to his left
+        { key = "medic_freezer", section = PHYSIC_OBJECT, visual = [[dynamics\kitchen_room\freezer]], fixed_bones = "root",
+          pos = { -173.73508, 2.48869, 415.53053 }, heading = 3.23391 },
+        { key = "lamp_medic", section = HANGING_LAMP, lamp = WIRE_LAMP,
+          pos = { -171.59898, 4.85432, 417.12808 }, heading = 0, bank = math.pi },
+    },
+}
+
+-- The restrictor piece covering a list's obstacles: one sphere per obstacle, offset from the first.
+local function blocker_piece(list)
+    local blocker
+    for _, piece in ipairs(list) do
+        if piece.obstacle then
+            blocker = blocker or { key = "ai_blocker", section = SPACE_RESTRICTOR, pos = piece.pos, heading = 0, spheres = {} }
+            local p, o = piece.pos, blocker.pos
+            table.insert(blocker.spheres, { p[1] - o[1], p[2] - o[2], p[3] - o[3], radius = piece.obstacle })
+        end
+    end
+    return blocker
+end
+
+for _, list in pairs(pieces) do
+    local blocker = blocker_piece(list)
+    if blocker then
+        list[#list + 1] = blocker
+    end
+end
+
+-- What a piece was created with, compared against the list rather than the live object: the engine may
+-- renormalize a physic object's stored angle and position.
+local function piece_signature(piece)
+    local sig = string.format("%.3f,%.3f,%.3f,%.3f", piece.pos[1], piece.pos[2], piece.pos[3], piece.heading)
+    if piece.bank then
+        sig = string.format("%s,%.3f", sig, piece.bank)
+    end
+    for _, s in ipairs(piece.spheres or {}) do
+        sig = string.format("%s|%.3f,%.3f,%.3f,%.3f", sig, s[1], s[2], s[3], s.radius)
+    end
+    return piece.ini and sig .. "|" .. piece.ini or sig
+end
+
+-- The piece's stored object, if it still exists as that section and matches the listed signature;
+-- a stale one is released so the caller recreates it.
+local function current(id, piece, signature)
+    local se_obj = id and alife_object(id)
+    if not (se_obj and se_obj:section_name() == piece.section) then
+        return
+    end
+    if signature ~= piece_signature(piece) then
+        alife_release(se_obj)
+        return
+    end
+    return se_obj
+end
+
+local function create(piece, gvid)
+    local pos = vector():set(piece.pos[1], piece.pos[2], piece.pos[3])
+    local lvid = warfare_utils.nearest_lvid(pos)
+    if not lvid then
+        return
+    end
+
+    local se_obj = alife_create(piece.section, pos, lvid, gvid)
+    if not se_obj then
+        return
+    end
+    se_obj.angle = vector():set(0, piece.heading, piece.bank or 0)
+
+    if piece.spheres then
+        local data = utils_stpk.get_space_restrictor_data(se_obj)
+        data.shapes = {}
+        for i, s in ipairs(piece.spheres) do
+            data.shapes[i] = { shtype = 0, offset = vector():set(s[1], s[2], s[3]), radius = s.radius }
+        end
+        data.restrictor_type = DEFAULT_IN_RESTRICTOR
+        utils_stpk.set_space_restrictor_data(data, se_obj)
+        return se_obj.id
+    end
+
+    if piece.lamp then
+        local data = utils_stpk.get_lamp_data(se_obj)
+        for k, v in pairs(piece.lamp) do
+            data[k] = v
+        end
+        utils_stpk.set_lamp_data(data, se_obj)
+        return se_obj.id
+    end
+
+    -- Physics type and mass stay at the physic_object defaults (skeleton, mass 10): a zero mass
+    -- faults the physics world on the first frame.
+    local data = utils_stpk.get_physic_data(se_obj)
+    if piece.visual then
+        data.visual_name = piece.visual
+    end
+    if piece.fixed_bones then
+        data.fixed_bones = piece.fixed_bones
+    end
+    data.custom_data = piece.ini or COLLIDE_INI
+    utils_stpk.set_physic_data(data, se_obj)
+    return se_obj.id
+end
+
+local function release_unlisted(smart_name, list, ids, signatures)
+    local listed = {}
+    for _, piece in ipairs(list) do
+        listed[piece.key] = true
+    end
+    for key, id in pairs(ids) do
+        if not listed[key] then
+            local se_obj = alife_object(id)
+            if se_obj then
+                alife_release(se_obj)
+            end
+            ids[key] = nil
+            signatures[key] = nil
+            warfare_log.info("warfare_base_props: released unlisted smart=%s piece=%s id=%s", smart_name, key, id)
+        end
+    end
+end
+
+local function actor_on_first_update()
+    if not IsWarfare() then
+        return
+    end
+
+    local st = alife_storage_manager.get_state()
+    st.warfare_base_props = st.warfare_base_props or {}
+    st.warfare_base_props_poses = st.warfare_base_props_poses or {}
+
+    for smart_name, list in pairs(pieces) do
+        local smart = warfare_utils.smart_on_actor_level(smart_name)
+        if smart then
+            local ids = st.warfare_base_props[smart_name] or {}
+            local signatures = st.warfare_base_props_poses[smart_name] or {}
+            release_unlisted(smart_name, list, ids, signatures)
+            local missing = 0
+            for _, piece in ipairs(list) do
+                if not current(ids[piece.key], piece, signatures[piece.key]) then
+                    ids[piece.key] = create(piece, smart.m_game_vertex_id)
+                    signatures[piece.key] = ids[piece.key] and piece_signature(piece)
+                    if not ids[piece.key] then
+                        missing = missing + 1
+                        warfare_log.warn("warfare_base_props: not created smart=%s piece=%s", smart_name, piece.key)
+                    end
+                end
+            end
+            st.warfare_base_props[smart_name] = ids
+            st.warfare_base_props_poses[smart_name] = signatures
+            warfare_log.info("warfare_base_props: smart=%s pieces=%s missing=%s", smart_name, #list, missing)
+        end
+    end
+end
+
+--- The smart a Warfare-created vice belongs to, or nil for any other vice.
+function smart_of_vice(id)
+    local st = alife_storage_manager.get_state()
+    for smart_name, ids in pairs(st.warfare_base_props or {}) do
+        if ids.vice == id then
+            return SIMBOARD.smarts_by_names[smart_name]
+        end
+    end
+end
+
+function on_game_start()
+    RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
+end

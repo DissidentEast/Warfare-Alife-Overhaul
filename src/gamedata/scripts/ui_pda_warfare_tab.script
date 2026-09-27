@@ -299,7 +299,7 @@ function pda_warfare_tab:Reset()
         end
         
         local base = self.curr_map and self.tot_smarts_lvl or self.tot_smarts
-        local rate = math.ceil((str_smarts / base)*100)
+        local rate = (base > 0) and math.ceil((str_smarts / base)*100) or 0
         local r_val = relation_registry.community_relation(f, actor_faction)
         local str_rel = ((r_val >= game_relations.FRIENDS) and "friend") or ((r_val <= game_relations.ENEMIES) and "enemy") or "neutral"
         self.progress_dominance[f] = xml:InitProgressBar("faction:dominance_" .. str_rel, _st)
@@ -347,7 +347,7 @@ function pda_warfare_tab:Update()
             local str_total_terrain_count = warfare.resource_count + warfare.base_count
             local str_total_resources_count = warfare.resource_count
 
-            str = strformat(str, str_fac, str_faction_terrain_count, str_total_terrain_count, str_faction_base_count, str_total_base_count, str_extra, game.translate_string(str_territory))
+            str = strformat(str, str_fac, str_faction_terrain_count, str_total_terrain_count, str_faction_base_count, str_total_base_count, str_extra, game.translate_string(str_territory or ""))
             
             self.hint_wnd:Update(str)
             return

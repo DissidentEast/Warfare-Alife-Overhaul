@@ -20,9 +20,10 @@
         [warfare_brutal]
                 display_name              = "Brutal"    ; quoted: _parse eats bare spaces
                 user                      = true        ; written only by Save
+                version                   = 2           ; settings version; absent = 1
                 alife/warfare/general/... = ...
 
-    Both metadata keys are skipped by the apply loop for free: ui_options.get_opt_table
+    The metadata keys are skipped by the apply loop for free: ui_options.get_opt_table
     returns an empty table for ids it does not know, so they never reach an option.
 
     "user" is the write guard. Save only overwrites, and Delete only removes, a preset
@@ -31,9 +32,11 @@
     matters under MO2: file_delete unlinks the real file in whichever mod folder
     provides it.
 
-    Schema drift needs no migration. Vanilla's apply loop skips ids get_opt_table does
-    not recognize, and options a preset omits simply keep their current value, so old
-    presets keep loading across mod versions.
+    Added and removed options need no migration: the apply loop skips ids get_opt_table
+    does not recognize, and options a preset omits keep their current value. What a stored
+    value means is versioned by warfare_options.SETTINGS_VERSION, shared with the saved
+    settings: older presets are converted on apply, and a newer or unreadable version asks
+    before applying unconverted.
 =======================================================================================
 
 --]]
@@ -42,6 +45,7 @@ local PRESET_DIR    = "presets\\"
 local PRESET_PREFIX = "warfare_"
 local KEY_DISPLAY   = "display_name"
 local KEY_USER      = "user"
+local KEY_VERSION   = "version"    -- warfare_options.SETTINGS_VERSION the values were saved at
 local STR_PRST      = "ui_mm_prst_"
 
 -- Mirrors ui_options' file-local `opt_section`: the axr_options.ltx section every option
@@ -96,6 +100,14 @@ local function read_flag(ini, slug, key)
     return ini:r_bool(slug, key)
 end
 
+--- The preset's format version, or nil when the key holds no number.
+local function read_version(ini, slug)
+    if not ini:line_exist(slug, KEY_VERSION) then
+        return 1
+    end
+    return tonumber(ini:r_string_ex(slug, KEY_VERSION))
+end
+
 local function read_meta(slug)
     local ini = ini_file(preset_path(slug))
     if not ini:section_exist(slug) then
@@ -106,6 +118,7 @@ local function read_meta(slug)
         slug    = slug,
         display = resolve_display(ini, slug),
         user    = read_flag(ini, slug, KEY_USER),
+        version = read_version(ini, slug),
     }
 end
 
@@ -341,6 +354,7 @@ function save_preset(slug, display)
 
     ini:w_string(slug, KEY_DISPLAY, "\"" .. display .. "\"", "")
     ini:w_string(slug, KEY_USER, "true", "")
+    ini:w_string(slug, KEY_VERSION, tostring(warfare_options.SETTINGS_VERSION), "")
     for i = 1, #values do
         ini:w_string(slug, values[i].id, tostring(values[i].value), "")
     end
@@ -382,6 +396,7 @@ local function apply_preset(self, slug)
         return false
     end
 
+    local version = read_version(ini, slug)
     local applied = 0
     local n = ini:line_count(slug)
     for i = 0, n - 1 do
@@ -398,6 +413,7 @@ local function apply_preset(self, slug)
                 elseif v.val == 2 then
                     value = tonumber(value)
                 end
+                value = warfare_options.convert_value(version, id, value)
 
                 local t = ui_options.str_opt_explode(id)
                 local opt = t[#t]
@@ -412,8 +428,8 @@ local function apply_preset(self, slug)
         end
     end
 
-    warfare_log.info("modxml_warfare_presets.apply_preset: [%s] applied %s of %s lines",
-        slug, tostring(applied), tostring(n))
+    warfare_log.info("modxml_warfare_presets.apply_preset: [%s] version %s applied %s of %s lines",
+        slug, tostring(version), tostring(applied), tostring(n))
     return true
 end
 
@@ -479,6 +495,7 @@ function ui_options.UIOptions.InitCallBacks(self)
     self:AddCallback("wp_prompt_ok", ui_events.BUTTON_CLICKED, self.wp_OnPromptOk, self)
     self:AddCallback("wp_prompt_cancel", ui_events.BUTTON_CLICKED, self.wp_OnPromptCancel, self)
     self:AddCallback("wp_mb", ui_events.MESSAGE_BOX_YES_CLICKED, self.wp_OnConfirm, self)
+    self:AddCallback("wp_mb", ui_events.MESSAGE_BOX_NO_CLICKED, self.wp_OnDecline, self)
 end
 
 --------------------------------------------------------------------------------------
@@ -575,9 +592,23 @@ function ui_options.UIOptions.Callback_Preset(self)
         return
     end
 
-    ct.wp_curr = entry.slug
-    self.wp_sel_slug = entry.slug
-    apply_preset(self, entry.slug)
+    if not warfare_options.is_supported_version(entry.version) then
+        self.wp_mb_slug = entry.slug
+        self:wp_Message("message_box_yes_no",
+            strformat(game.translate_string("ui_mm_warfare_preset_unsupported"),
+                entry.display, entry.version and tostring(entry.version) or "?", tostring(warfare_options.SETTINGS_VERSION)),
+            "apply")
+        return
+    end
+
+    self:wp_DoApply(entry.slug)
+end
+
+function ui_options.UIOptions.wp_DoApply(self, slug)
+    local ct = self.last_curr_tree
+    ct.wp_curr = slug
+    self.wp_sel_slug = slug
+    apply_preset(self, slug)
 
     self:Reset_opt(ct, self.last_path)
     self:UpdatePending()
@@ -700,6 +731,8 @@ function ui_options.UIOptions.wp_OnConfirm(self)
 
     if action == "save" then
         self:wp_DoSave(self.wp_mb_slug, self.wp_mb_display)
+    elseif action == "apply" then
+        self:wp_DoApply(self.wp_mb_slug)
     elseif action == "delete" then
         if delete_preset(self.wp_mb_slug) then
             self.wp_sel_slug = nil
@@ -709,6 +742,17 @@ function ui_options.UIOptions.wp_OnConfirm(self)
             self:Register_Preset(self.last_curr_tree)
             self:wp_UpdateDelete()
         end
+    end
+end
+
+function ui_options.UIOptions.wp_OnDecline(self)
+    local action = self.wp_mb_action
+    self.wp_mb_action = nil
+
+    -- The combo already shows the declined preset; put back the one still in effect.
+    if action == "apply" then
+        local entry = self:wp_Selected()
+        self.preset:SetText(entry and entry.display or "")
     end
 end
 

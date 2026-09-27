@@ -458,6 +458,9 @@
 	<string id="ui_mm_warfare_preset_overwrite">
 		<text>Overwrite the preset '%s'?</text>
 	</string>
+	<string id="ui_mm_warfare_preset_unsupported">
+		<text>The preset '%s' was saved in format %s, but this version of Warfare only reads up to %s. Some values may mean something different here. Apply it anyway?</text>
+	</string>
 	<string id="ui_mm_warfare_preset_protected">
 		<text>'%s' is a built-in preset and cannot be replaced. Pick another name.</text>
 	</string>

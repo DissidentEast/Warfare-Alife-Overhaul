@@ -453,6 +453,9 @@
 	<string id="ui_mm_warfare_preset_overwrite">
 		<text>Перезаписать пресет «%s»?</text>
 	</string>
+	<string id="ui_mm_warfare_preset_unsupported">
+		<text>Пресет «%s» сохранён в формате %s, а эта версия Warfare понимает только до %s. Часть значений может работать не так, как задумано. Всё равно применить?</text>
+	</string>
 	<string id="ui_mm_warfare_preset_protected">
 		<text>«%s» — встроенный пресет, его нельзя заменить. Выберите другое название.</text>
 	</string>

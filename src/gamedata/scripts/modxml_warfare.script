@@ -210,7 +210,7 @@ function ui_options.init_opt_coder()
             { id = "capture", featured = { "auto_capture", "auto_capture_max_distance" }, rows = {
                 { id = "auto_capture", type = "check", val = 1, def = false },
                 { id = "auto_capture_max_distance", type = "track", val = 2, def = 50, min = 0, max = 100, step = 5, fmt = "meters" },
-                { id = "auto_capture_wait_time", type = "track", val = 2, def = 6, min = 0, max = 60, step = 6, fmt = "time_dhms" },
+                { id = "auto_capture_wait_time", type = "track", val = 2, def = 60, min = 0, max = 600, step = 30, fmt = "time_dhms" },
                 { id = "use_old_auto_capture", type = "check", val = 1, def = false },
                 { id = "prevent_mainbase_attacks", type = "check", val = 1, def = true },
             } },

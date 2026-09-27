@@ -189,7 +189,7 @@
 		<text>The chance that a faction will send out invasion forces or send patrol squads anywhere during the night time. Night time is considered as between the hours of 8:00pm and 6:00am, or 20:00 and 6:00. Whether a smart terrain can be active during nighttime is decided once per night per smart terrain. For free stalker and ecologist factions, this sets the likelihood for a squad to visit another resource point instead of going back to base for the night.</text>
 	</string>
 	<string id="ui_mm_alife_warfare_faction_min_faction_respawn_desc">
-		<text>This is how many in-game minutes it takes for a faction to spawn a squad from a base point if they own only one base. As your faction gains more bases, each individual base will have a slightly longer spawn time approaching that of the maximum respawn time. The actual respawn time of a given base is linearly interpolated based on the min/max respawn values and the percentage of bases in the Zone you control.</text>
+		<text>This is how long it takes for a faction to spawn a squad from a base point if they own only one base; the slider shows the duration in game time. As your faction gains more bases, each individual base will have a slightly longer spawn time approaching that of the maximum respawn time. The actual respawn time of a given base is linearly interpolated based on the min/max respawn values and the percentage of bases in the Zone you control.</text>
 	</string>
 
 	<string id="ui_mm_alife_warfare_faction_min_invasion_size_desc">
@@ -205,7 +205,7 @@
 		<text>How many patrol squads each base of this faction keeps out at once. 0 disables base patrols.</text>
 	</string>
 	<string id="ui_mm_alife_warfare_faction_min_patrol_time_desc">
-		<text>This is how many in-game minutes it takes for a faction to spawn a patrol squad from a base point if they own only one base. As your faction gains more bases, each individual base will have a slightly longer patrol spawn time approaching that of the maximum patrol respawn time. The actual patrol respawn time of a given base is linearly interpolated based on the min/max patrol respawn values and the percentage of bases in the Zone you control.</text>
+		<text>This is how long it takes for a faction to spawn a patrol squad from a base point if they own only one base; the slider shows the duration in game time. As your faction gains more bases, each individual base will have a slightly longer patrol spawn time approaching that of the maximum patrol respawn time. The actual patrol respawn time of a given base is linearly interpolated based on the min/max patrol respawn values and the percentage of bases in the Zone you control.</text>
 	</string>
 
 	<string id="ui_mm_alife_warfare_faction_patrol_hunt_chance_desc">
@@ -245,7 +245,7 @@
 		<text>The highest possible time for a new random patrol of this faction to spawn. The actual spawn time is randomly chosen between this number and the minimum random patrol time.</text>
 	</string>
 	<string id="ui_mm_alife_warfare_faction_invasion_departure_chance_desc">
-		<text>The chance that an invasion will depart during the current process_targets update. This is called every 1 to 5 in-game minutes.</text>
+		<text>The chance that an invasion will depart during the current process_targets update. Each base runs this update every 18 to 90 in-game seconds.</text>
 	</string>
 	<string id="ui_mm_alife_warfare_faction_base_priority_desc">
 		<text>How much the faction prioritises bases.</text>

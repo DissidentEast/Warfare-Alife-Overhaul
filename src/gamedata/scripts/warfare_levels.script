@@ -193,12 +193,12 @@ end
 
 -- Updates information for the specified level.
 function update_level(lvl)
-	if (not level_timers[lvl] or warfare.get_time_ref():diffSec(level_timers[lvl]) >= (level_information[lvl].next_update*6)) then
+	if (not level_timers[lvl] or warfare.get_time_ref():diffSec(level_timers[lvl]) >= level_information[lvl].next_update) then
 		warfare_log.trace("update_level: lvl=%s entering update branch", tostring(lvl))
 
 		level_timers[lvl] = warfare.get_time()
 
-		level_information[lvl].next_update = math.random(5, 20)
+		level_information[lvl].next_update = math.random(30, 120)
 		
 		--printf("--- updating " .. game.translate_string(alife():level_name(lvl)) .. " ---")
 		

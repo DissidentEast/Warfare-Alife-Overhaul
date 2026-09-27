@@ -73,6 +73,22 @@ function migrate_level_priority_scale()
     warfare_log.info("warfare_options: migrated %s level priorities to the +/-100 scale", tostring(changed))
 end
 
+-- Replace a legacy boolean option with its list successor; a successor already set wins.
+-- Reads go to the ini directly: r_value caches, and remove_line does not evict the cache.
+local function migrate_bool_option(old_key, new_key, on_value)
+    local cfg = axr_main.config
+    local raw = cfg:r_string_ex("options", old_key)
+    if raw == nil then
+        return
+    end
+    if not cfg:line_exist("options", new_key) then
+        local migrated = (raw == "true") and on_value or "off"
+        warfare_log.info("warfare_options: migrating %s=%s -> %s=%s", old_key, raw, new_key, migrated)
+        cfg:w_value("options", new_key, migrated)
+    end
+    cfg:remove_line("options", old_key)
+    cfg:save()
+end
 
 function update_settings()
     warfare_log.info("warfare_options.update_settings: reading MCM settings")
@@ -119,15 +135,7 @@ function update_settings()
     migrate_level_priority_scale()
 
     -- Migrate old boolean purge_zone_on_emission -> emission_effect
-    local old_purge = axr_main.config:r_value("options", "alife/warfare/general/purge_zone_on_emission", 0)
-    if old_purge ~= nil then
-        local old_val = axr_main.config:r_value("options", "alife/warfare/general/purge_zone_on_emission", 1)
-        local migrated = old_val == true and "kill" or "off"
-        warfare_log.info("warfare_options: migrating purge_zone_on_emission=%s -> emission_effect=%s", tostring(old_val), tostring(migrated))
-        axr_main.config:w_value("options", "alife/warfare/general/emission_effect", migrated)
-        axr_main.config:remove_line("options", "alife/warfare/general/purge_zone_on_emission")
-        axr_main.config:save()
-    end
+    migrate_bool_option("alife/warfare/general/purge_zone_on_emission", "alife/warfare/general/emission_effect", "zombify")
 
     options.emission_effect = ui_options.get("alife/warfare/general/emission_effect")
     options.purge_zone_percentage = ui_options.get("alife/warfare/general/purge_zone_percentage")
@@ -188,15 +196,7 @@ function update_settings()
     options.max_invasion_depart_time         = ui_options.get("alife/warfare/general/max_invasion_depart_time")
 
     -- Migrate old boolean enable_player_command -> command_mode ("ranked" is what "on" meant)
-    local old_cmd = axr_main.config:r_value("options", "alife/warfare/command/enable_player_command", 0)
-    if old_cmd ~= nil then
-        local old_val = axr_main.config:r_value("options", "alife/warfare/command/enable_player_command", 1)
-        local migrated = old_val == true and "ranked" or "off"
-        warfare_log.info("warfare_options: migrating enable_player_command=%s -> command_mode=%s", tostring(old_val), migrated)
-        axr_main.config:w_value("options", "alife/warfare/command/command_mode", migrated)
-        axr_main.config:remove_line("options", "alife/warfare/command/enable_player_command")
-        axr_main.config:save()
-    end
+    migrate_bool_option("alife/warfare/command/enable_player_command", "alife/warfare/command/command_mode", "ranked")
 
     -- Player command. "ranked" scales the controllable count with the actor's rank on the fixed
     -- Anomaly rank ladder and lets the rank gap decide which squads are eligible; "unrestricted"

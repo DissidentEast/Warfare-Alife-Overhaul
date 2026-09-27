@@ -144,7 +144,7 @@ function update_faction(faction)
 
     local fi = faction_information[faction]
 
-    if (not fi.timer or warfare.get_time_ref():diffSec(fi.timer) >= (fi.next_update * 6)) then
+    if (not fi.timer or warfare.get_time_ref():diffSec(fi.timer) >= fi.next_update) then
         warfare_log.trace("update_faction: %s entering update branch (base_count=%s, resource_count=%s, total_power=%s)", tostring(faction), tostring(fi.base_count), tostring(fi.resource_count), tostring(fi.total_power))
 
         local last_resurgence_attempt = fi.last_resurgence_attempt or warfare.get_time()
@@ -154,18 +154,18 @@ function update_faction(faction)
 
         -- Fix #3: save timer state before wipe
         local old_timer = fi.timer
-        local old_next_update = fi.next_update or 1
+        local old_next_update = fi.next_update or 6
 
         faction_information[faction] = {}
         fi = faction_information[faction]
 
         if old_timer then
-            fi.timer = warfare_utils.add_time(old_timer, old_next_update * 6)
+            fi.timer = warfare_utils.add_time(old_timer, old_next_update)
         else
             fi.timer = warfare.get_time()
         end
 
-        fi.next_update = math.random(1, 5)
+        fi.next_update = math.random(6, 30)
         fi.base_count = 0
         fi.resource_count = 0
         fi.owned_base_count = 0
@@ -251,9 +251,9 @@ function update_faction(faction)
         fi.patrol_pop_factor = patrol_pop_factor
 
         if (ff.random_patrols) and not warfare.is_spawn_blocked() then
-            if (warfare.get_time_ref():diffSec(fi.last_random_patrol) > fi.next_random_patrol * 6) then
+            if (warfare.get_time_ref():diffSec(fi.last_random_patrol) > fi.next_random_patrol) then
                 warfare_log.debug("update_faction: %s random patrol timer elapsed, attempting spawn", tostring(faction))
-                fi.last_random_patrol = warfare_utils.add_time(fi.last_random_patrol, fi.next_random_patrol*6)
+                fi.last_random_patrol = warfare_utils.add_time(fi.last_random_patrol, fi.next_random_patrol)
                 fi.next_random_patrol = math.random(min_random_patrol_time, max_random_patrol_time) * spawn_mult
 
                 local start_id = smart_terrain_warfare.find_random_patrol_target(nil, faction)
@@ -278,7 +278,7 @@ function update_faction(faction)
                         local actor_dist = start.position:distance_to(db.actor:position())
                         if (actor_dist < 50) then
                             spawn_random_patrol = false
-                            fi.next_random_patrol = math.random(30, 120)        -- if random patrol fails to spawn, check back sooner to try elsewhere
+                            fi.next_random_patrol = math.random(180, 720)        -- if random patrol fails to spawn, check back sooner to try elsewhere
                             warfare_log.debug("update_faction: %s random patrol cancelled (start %s too close to player: %s)", tostring(faction), start:name(), tostring(actor_dist))
                         end
                     end
@@ -301,7 +301,7 @@ function update_faction(faction)
         -- Emergency resurrection when faction has 0 bases
         if not warfare.is_spawn_blocked() and (fi.base_count < 1) then
             warfare_log.debug("update_faction: %s has 0 effective bases (base_count=%s), considering resurgence", tostring(faction), tostring(fi.base_count))
-            if (warfare.get_time_ref():diffSec(fi.last_resurgence_attempt) > fi.next_resurgence_attempt * 6) then
+            if (warfare.get_time_ref():diffSec(fi.last_resurgence_attempt) > fi.next_resurgence_attempt) then
                 warfare_log.info("update_faction: %s resurgence timer elapsed, attempting resurrection", tostring(faction))
                 fi.last_resurgence_attempt = warfare.get_time()
                 fi.next_resurgence_attempt = math.random(min_resurgence_wait_time, max_resurgence_wait_time)

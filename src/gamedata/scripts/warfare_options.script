@@ -90,6 +90,91 @@ local function migrate_bool_option(old_key, new_key, on_value)
     cfg:save()
 end
 
+-- What stored warfare option values mean, shared by the saved settings and preset files.
+-- Settings or a preset carrying no version are version 1.
+SETTINGS_VERSION = 2
+local SETTINGS_VERSION_KEY = "alife/warfare/general/_settings_version"
+
+local GENERAL_TIME_OPTIONS = {
+    "auto_capture_wait_time", "monster_min_faction_respawn", "monster_max_faction_respawn",
+    "min_invasion_depart_time", "max_invasion_depart_time",
+}
+
+local FACTION_TIME_OPTIONS = {
+    "min_faction_respawn", "min_patrol_time", "min_patrol_rest_time", "max_patrol_rest_time",
+    "min_random_patrol_time", "max_random_patrol_time", "min_resurgence_wait_time", "max_resurgence_wait_time",
+}
+
+local function time_option_keys()
+    local keys = {}
+    for _, id in ipairs(GENERAL_TIME_OPTIONS) do
+        keys["alife/warfare/general/" .. id] = true
+    end
+    for _, faction in pairs(warfare_factions.factions) do
+        for _, id in ipairs(FACTION_TIME_OPTIONS) do
+            keys["alife/warfare/" .. faction .. "/" .. id] = true
+        end
+    end
+    return keys
+end
+
+local time_keys
+
+-- CONVERTERS[v](id, value) returns the version v+1 meaning of a version v value.
+local CONVERTERS = {
+    -- Durations went from 6-second units to game seconds.
+    [1] = function(id, value)
+        time_keys = time_keys or time_option_keys()
+        if time_keys[id] and type(value) == "number" then
+            return value * 6
+        end
+        return value
+    end,
+}
+
+--- Whether values stored at `version` can be converted to SETTINGS_VERSION.
+function is_supported_version(version)
+    return version ~= nil and version >= 1 and version <= SETTINGS_VERSION and version == math.floor(version)
+end
+
+--- A value stored at `version`, in SETTINGS_VERSION meaning. Unsupported versions pass through.
+function convert_value(version, id, value)
+    if not is_supported_version(version) then
+        return value
+    end
+    for v = version, SETTINGS_VERSION - 1 do
+        value = CONVERTERS[v](id, value)
+    end
+    return value
+end
+
+--- Bring the saved warfare settings up to SETTINGS_VERSION. Settings from a newer version are left as they are.
+function migrate_settings()
+    local cfg = axr_main.config
+    local version = cfg:r_value("options", SETTINGS_VERSION_KEY, 2, 1)
+    if not (is_supported_version(version) and version < SETTINGS_VERSION) then
+        return
+    end
+
+    local prefix = "alife/warfare/"
+    local changed = 0
+    for id, raw in pairs(cfg:collect_section("options")) do
+        if string.sub(id, 1, #prefix) == prefix then
+            local value = tonumber(raw) or raw
+            local converted = convert_value(version, id, value)
+            if converted ~= value then
+                cfg:w_value("options", id, converted)
+                changed = changed + 1
+            end
+        end
+    end
+
+    cfg:w_value("options", SETTINGS_VERSION_KEY, SETTINGS_VERSION)
+    cfg:save()
+    warfare_log.info("warfare_options: migrated settings from version %s to %s (%s values changed)",
+        tostring(version), tostring(SETTINGS_VERSION), tostring(changed))
+end
+
 function update_settings()
     warfare_log.info("warfare_options.update_settings: reading MCM settings")
     options.factions = {}

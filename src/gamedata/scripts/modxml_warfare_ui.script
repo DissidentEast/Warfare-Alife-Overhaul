@@ -18,7 +18,7 @@ local function update_ctrl_text(ctrl, fmt, value)
     if not max_i then
         return
     end
-    local v = (tonumber(value) or 0) * 6
+    local v = tonumber(value) or 0
     local all = { { math.floor(v / 86400), "d" }, { math.floor((v % 86400) / 3600), "h" }, { math.floor((v % 3600) / 60), "m" }, { math.floor(v % 60), "s" } }
     local parts = {}
     for i = 1, max_i do

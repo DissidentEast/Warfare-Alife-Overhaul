@@ -109,7 +109,7 @@ function compute_night_seconds(start_time, delta)
     return total_night
 end
 
--- Given a spawn timer timestamp and its full interval (already *6 and with delay),
+-- Given a spawn timer timestamp and its full interval (game seconds, with delay),
 -- return real game-seconds until spawn, projecting through night periods.
 -- During night the timer is effectively frozen, so real time includes the skip.
 function get_real_seconds_until_spawn(timer, interval)

@@ -253,7 +253,7 @@ function squad_warfare_update(squad)
                                 se_target:on_after_reach(squad)
                                 squad.current_action = 1
                                 squad.arrive_time = warfare.get_time()
-                                squad.wait_time = math.random(10, 60)
+                                squad.wait_time = math.random(60, 360)
                             end
                         end
                     else
@@ -284,7 +284,7 @@ function squad_warfare_update(squad)
                         se_target:on_after_reach(squad)
                         squad.current_action = 1
                         squad.arrive_time = warfare.get_time()
-                        squad.wait_time = math.random(10, 60)
+                        squad.wait_time = math.random(60, 360)
                     end
                 end
             end
@@ -661,7 +661,7 @@ function get_squad_info(squad, full_detail, show_target)
             if (squad.patrol_table) then
                 if (squad.patrol_table.arrive_time and squad.patrol_table.stay_time) then
                     local diff = warfare.get_time():diffSec(squad.patrol_table.arrive_time)
-                    local remaining = (squad.patrol_table.stay_time * 6) - diff
+                    local remaining = squad.patrol_table.stay_time - diff
 
                     -- xQd, show the timer in hours and minutes
                     if remaining <= 3600 then
@@ -783,7 +783,7 @@ function squad_is_settled(squad)
     if not (squad and squad.arrive_time and squad.wait_time) then
         return false
     end
-    return warfare.get_time_ref():diffSec(squad.arrive_time) < (squad.wait_time * 6)
+    return warfare.get_time_ref():diffSec(squad.arrive_time) < squad.wait_time
 end
 
 

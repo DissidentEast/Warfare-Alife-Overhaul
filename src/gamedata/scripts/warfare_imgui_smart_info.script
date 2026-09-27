@@ -83,7 +83,7 @@ function get_defense_timer(smart)
 
     local defense_timer = smart_terrain_warfare.defense_timers[smart.id]
     local delay = smart_terrain_warfare.defense_delay[smart.id] or 0
-    local remaining = warfare_utils.get_real_seconds_until_spawn(defense_timer, (next_defense * 6) * (delay + 1))
+    local remaining = warfare_utils.get_real_seconds_until_spawn(defense_timer, next_defense * (delay + 1))
     return format_time_remaining(remaining)
 end
 
@@ -102,7 +102,7 @@ function get_patrol_timer(smart)
     local patrol_timer = smart_terrain_warfare.patrol_timers[smart.id]
     local next_patrol = smart_terrain_warfare.get_current_patrol_respawn_interval(smart.owning_faction)
 
-    local remaining = warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol * 6)
+    local remaining = warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol)
     return format_time_remaining(remaining)
 end
 
@@ -162,7 +162,7 @@ function get_unique_check_timer(smart)
     end
     
     local diff = warfare.get_time():diffSec(smart.last_unique_check)
-    local remaining = (smart.next_unique_check  * 6) - diff
+    local remaining = smart.next_unique_check - diff
     
     return format_time_remaining(remaining)
 end
@@ -279,7 +279,7 @@ function render_faction_smart_info(smart, faction)
             ImGui.Text("  Timer Status: Pending Reset")
         elseif defense_timer_val and next_update_val then
             local delay = smart_terrain_warfare.defense_delay[smart.id] or 0
-            local remaining = warfare_utils.get_real_seconds_until_spawn(defense_timer_val, (next_update_val * 6) * (delay + 1))
+            local remaining = warfare_utils.get_real_seconds_until_spawn(defense_timer_val, next_update_val * (delay + 1))
 
             local time_status = format_time_remaining(remaining)
             if time_status == "Ready" then
@@ -287,7 +287,7 @@ function render_faction_smart_info(smart, faction)
             else
                 ImGui.Text("  Spawn Status: " .. time_status .. " remaining")
             end
-            ImGui.Text("  Spawn Interval was: " .. format_time_remaining(next_update_val  * 6))
+            ImGui.Text("  Spawn Interval was: " .. format_time_remaining(next_update_val))
         else
             ImGui.Text("  Timer Status: Not initialized")
         end
@@ -307,7 +307,7 @@ function render_faction_smart_info(smart, faction)
         ImGui.Text("  Next Check: " .. unique_timer)
         
         if smart.last_unique_check and smart.next_unique_check then
-            ImGui.Text("  Check Interval: " .. format_time_remaining(smart.next_unique_check  * 6))
+            ImGui.Text("  Check Interval: " .. format_time_remaining(smart.next_unique_check))
             ImGui.Text("  Interval Range: 45m - 75m (random)")
         else
             ImGui.Text("  Timer Details: Not available")
@@ -390,14 +390,14 @@ function render_faction_smart_info(smart, faction)
             local spawn_mult = 1 / (warfare_options.options.spawn_speed_multiplier or 1)
             local final_respawn = smart_terrain_warfare.get_current_def_respawn_interval(faction)
 
-            ImGui.Text("  Min Respawn Time: " .. format_time_remaining(min_respawn  * 6))
-            ImGui.Text("  Max Respawn Time: " .. format_time_remaining(max_respawn  * 6))
+            ImGui.Text("  Min Respawn Time: " .. format_time_remaining(min_respawn))
+            ImGui.Text("  Max Respawn Time: " .. format_time_remaining(max_respawn))
             ImGui.Text("  Faction Bases: " .. tostring(faction_bases))
             ImGui.Text("  Total Bases: " .. tostring(base_count_total))
             ImGui.Text("  Lerp Factor: " .. string.format("%.3f", lerp_factor))
-            ImGui.Text("  Calculated Interval: " .. format_time_remaining(calculated_respawn  * 6))
+            ImGui.Text("  Calculated Interval: " .. format_time_remaining(calculated_respawn))
             ImGui.Text("  Spawn Speed Multiplier: " .. string.format("%.2fx", spawn_mult))
-            ImGui.Text("  Final Interval: " .. format_time_remaining(final_respawn  * 6))
+            ImGui.Text("  Final Interval: " .. format_time_remaining(final_respawn))
         else
             ImGui.Text("  Calculation Data: Not available")
         end
@@ -407,7 +407,7 @@ function render_faction_smart_info(smart, faction)
         
         if smart.process_squads_time and smart.next_process_squads_time then
             local diff = warfare.get_time():diffSec(smart.process_squads_time)
-            local remaining = (smart.next_process_squads_time  * 6) - diff
+            local remaining = smart.next_process_squads_time - diff
             
             local time_status = format_time_remaining(remaining)
             if time_status == "Ready" then
@@ -415,7 +415,7 @@ function render_faction_smart_info(smart, faction)
             else
                 ImGui.Text("  Process Status: " .. time_status .. " remaining")
             end
-            ImGui.Text("  Process Interval: " .. format_time_remaining(smart.next_process_squads_time  * 6))
+            ImGui.Text("  Process Interval: " .. format_time_remaining(smart.next_process_squads_time))
             ImGui.Text("  Random Range: 5m - 90m (reduced load)")
         else
             ImGui.Text("  Process Status: Not initialized")
@@ -452,7 +452,7 @@ function render_mutant_smart_info(smart)
     
     if spawn_timer and next_update then
         local diff = warfare.get_time():diffSec(spawn_timer)
-        local remaining = (next_update  * 6) - diff
+        local remaining = next_update - diff
         
         local time_status = format_time_remaining(remaining)
         if time_status == "Ready" then
@@ -460,7 +460,7 @@ function render_mutant_smart_info(smart)
         else
             ImGui.Text("  Spawn Status: " .. time_status .. " remaining")
         end
-        ImGui.Text("  This Spawn Interval: " .. format_time_remaining(next_update  * 6))
+        ImGui.Text("  This Spawn Interval: " .. format_time_remaining(next_update))
     else
         ImGui.Text("  Timer Status: Not initialized")
     end
@@ -470,8 +470,8 @@ function render_mutant_smart_info(smart)
         local min_respawn = warfare_options.options.monster_min_faction_respawn
         local max_respawn = warfare_options.options.monster_max_faction_respawn
         
-        ImGui.Text("  Min Spawn Time: " .. format_time_remaining(min_respawn  * 6))
-        ImGui.Text("  Max Spawn Time: " .. format_time_remaining(max_respawn  * 6))
+        ImGui.Text("  Min Spawn Time: " .. format_time_remaining(min_respawn))
+        ImGui.Text("  Max Spawn Time: " .. format_time_remaining(max_respawn))
     else
         ImGui.Text("  Configuration: Not available")
     end
@@ -587,7 +587,7 @@ function render_mutant_smart_info(smart)
     
     if process_timer and process_next_update then
         local diff = warfare.get_time():diffSec(process_timer)
-        local remaining = (process_next_update  * 6) - diff
+        local remaining = process_next_update - diff
         
         local time_status = format_time_remaining(remaining)
         if time_status == "Ready" then
@@ -595,12 +595,12 @@ function render_mutant_smart_info(smart)
         else
             ImGui.Text("  Process Status: " .. time_status .. " remaining")
         end
-        ImGui.Text("  Process Interval: " .. format_time_remaining(process_next_update  * 6))
+        ImGui.Text("  Process Interval: " .. format_time_remaining(process_next_update))
         
         if warfare_options and warfare_options.options then
             local min_base = warfare_options.options.monster_min_faction_respawn
             local max_base = warfare_options.options.monster_max_faction_respawn
-            ImGui.Text("  Base Range: " .. format_time_remaining(min_base  * 6) .. " - " .. format_time_remaining(max_base  * 6))
+            ImGui.Text("  Base Range: " .. format_time_remaining(min_base) .. " - " .. format_time_remaining(max_base))
             ImGui.Text("  Multiplier: 2x (process is 2x slower than spawn)")
         end
     else
@@ -631,7 +631,7 @@ function render_mutant_smart_info(smart)
                         local wait_remaining = 0
                         if squad.arrive_time then
                             local time_here = warfare.get_time():diffSec(squad.arrive_time)
-                            wait_remaining = math.max(0, (squad.wait_time  * 6) - time_here)
+                            wait_remaining = math.max(0, squad.wait_time - time_here)
                         end
                         table.insert(mutant_behavior, {
                             section = squad:section_name(),
@@ -669,7 +669,7 @@ function render_mutant_smart_info(smart)
             for _, behavior in ipairs(mutant_behavior) do
                 local status_text = "    " .. behavior.section .. ": " .. behavior.status
                 if behavior.wait_time then
-                    status_text = status_text .. " (" .. format_time_remaining(behavior.wait_time * 6) .. " wait"
+                    status_text = status_text .. " (" .. format_time_remaining(behavior.wait_time) .. " wait"
                     if behavior.remaining then
                         status_text = status_text .. ", " .. format_time_remaining(behavior.remaining) .. " left"
                     end
@@ -834,10 +834,10 @@ function render()
         
         if defense_timer_val and next_update_val then
             local diff = warfare.get_time():diffSec(defense_timer_val)
-            local remaining = (next_update_val  * 6) - diff
+            local remaining = next_update_val - diff
             
             ImGui.Text("  Defense Check: " .. format_time_remaining(remaining))
-            ImGui.Text("  Next Check Interval: " .. format_time_remaining(next_update_val  * 6))
+            ImGui.Text("  Next Check Interval: " .. format_time_remaining(next_update_val))
         else
             ImGui.Text("  Defense Check: Not initialized")
         end

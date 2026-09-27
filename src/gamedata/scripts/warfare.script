@@ -1250,8 +1250,8 @@ function stagger_spawn_timers()
                 -- this exists to break up.
                 local def_interval = smart_terrain_warfare.get_current_def_respawn_interval(faction)
                 local pat_interval = smart_terrain_warfare.get_current_patrol_respawn_interval(faction)
-                local def_offset = math.random(0, math.floor(def_interval * 6))
-                local pat_offset = math.random(0, math.floor(pat_interval * 6))
+                local def_offset = math.random(0, math.floor(def_interval))
+                local pat_offset = math.random(0, math.floor(pat_interval))
 
                 smart_terrain_warfare.defense_timers[smart.id] = warfare_utils.subtract_time(get_time(), def_offset)
                 smart_terrain_warfare.patrol_timers[smart.id] = warfare_utils.subtract_time(get_time(), pat_offset)
@@ -1259,8 +1259,8 @@ function stagger_spawn_timers()
 
                 warfare_log.debug("stagger_spawn_timers: smart=%s faction=%s def=%s/%s pat=%s/%s",
                     smart:name(), faction,
-                    tostring(def_offset), tostring(def_interval * 6),
-                    tostring(pat_offset), tostring(pat_interval * 6))
+                    tostring(def_offset), tostring(def_interval),
+                    tostring(pat_offset), tostring(pat_interval))
             else
                 unowned = unowned + 1
             end

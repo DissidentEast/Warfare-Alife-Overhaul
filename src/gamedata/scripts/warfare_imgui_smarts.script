@@ -29,7 +29,7 @@ function get_spawn_timer(smart)
         local defense_timer = smart_terrain_warfare.defense_timers[smart.id]
 
         local delay = smart_terrain_warfare.defense_delay[smart.id] or 0
-        local remaining = warfare_utils.get_real_seconds_until_spawn(defense_timer, (next_defense * 6) * (delay + 1))
+        local remaining = warfare_utils.get_real_seconds_until_spawn(defense_timer, next_defense * (delay + 1))
         return warfare_imgui_smart_info.format_time_remaining(remaining)
     end
 
@@ -38,7 +38,7 @@ function get_spawn_timer(smart)
     local next_update = smart_terrain_warfare.spawn_mutant_next_update and smart_terrain_warfare.spawn_mutant_next_update[smart.id]
 
     if spawn_timer and next_update then
-        local remaining = warfare_utils.get_real_seconds_until_spawn(spawn_timer, next_update * 6)
+        local remaining = warfare_utils.get_real_seconds_until_spawn(spawn_timer, next_update)
         return warfare_imgui_smart_info.format_time_remaining(remaining)
     end
 
@@ -60,7 +60,7 @@ function get_patrol_timer(smart)
     local patrol_timer = smart_terrain_warfare.patrol_timers[smart.id]
     local next_patrol = smart_terrain_warfare.get_current_patrol_respawn_interval(smart.owning_faction)
 
-    local remaining = warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol * 6)
+    local remaining = warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol)
     return warfare_imgui_smart_info.format_time_remaining(remaining)
 end
 
@@ -110,7 +110,7 @@ function get_spawn_timer_number(smart)
         local defense_timer = smart_terrain_warfare.defense_timers[smart.id]
 
         local delay = smart_terrain_warfare.defense_delay[smart.id] or 0
-        return warfare_utils.get_real_seconds_until_spawn(defense_timer, (next_defense * 6) * (delay + 1))
+        return warfare_utils.get_real_seconds_until_spawn(defense_timer, next_defense * (delay + 1))
     end
 
     -- Check for mutant spawn timer if no defense timer found
@@ -118,7 +118,7 @@ function get_spawn_timer_number(smart)
     local next_update = smart_terrain_warfare.spawn_mutant_next_update and smart_terrain_warfare.spawn_mutant_next_update[smart.id]
 
     if spawn_timer and next_update then
-        return warfare_utils.get_real_seconds_until_spawn(spawn_timer, next_update * 6)
+        return warfare_utils.get_real_seconds_until_spawn(spawn_timer, next_update)
     end
 
     return 0
@@ -133,7 +133,7 @@ function get_patrol_timer_number(smart)
     local patrol_timer = smart_terrain_warfare.patrol_timers[smart.id]
     local next_patrol = smart_terrain_warfare.get_current_patrol_respawn_interval(smart.owning_faction)
 
-    return warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol * 6)
+    return warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol)
 end
 
 -- Sorting state variables

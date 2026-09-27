@@ -219,9 +219,12 @@ function update_faction(faction)
         fi.resource_count = resource_count
         warfare_log.trace("update_faction: %s aggregated bases=%s resources=%s power=%s active=%s inactive=%s", tostring(faction), tostring(base_count), tostring(resource_count), tostring(fi.total_power), tostring(fi.active_squads), tostring(fi.inactive_squads))
 
-        local respawn = warfare.lerp(ff.max_faction_respawn, ff.min_faction_respawn, clamp(resource_count / warfare.resource_count, 0, 1)) * spawn_mult
-        local patrol_respawn = warfare.lerp(ff.max_patrol_time, ff.min_patrol_time, clamp(resource_count / warfare.resource_count, 0, 1)) * spawn_mult
-        local invasion_size = warfare.lerp(ff.min_invasion_size, ff.max_invasion_size, clamp(base_count / warfare.base_count, 0, 1))
+        -- World totals are 0 until build_level_information has run.
+        local res_total = math.max(1, warfare.resource_count or 0)
+        local base_total = math.max(1, warfare.base_count or 0)
+        local respawn = warfare.lerp(ff.max_faction_respawn, ff.min_faction_respawn, clamp(resource_count / res_total, 0, 1)) * spawn_mult
+        local patrol_respawn = warfare.lerp(ff.max_patrol_time, ff.min_patrol_time, clamp(resource_count / res_total, 0, 1)) * spawn_mult
+        local invasion_size = warfare.lerp(ff.min_invasion_size, ff.max_invasion_size, clamp(base_count / base_total, 0, 1))
         local patrol_pop_factor = ff.patrol_squads
 
         -- Fix #1: only clean up current faction's registered squads (was iterating ALL factions)

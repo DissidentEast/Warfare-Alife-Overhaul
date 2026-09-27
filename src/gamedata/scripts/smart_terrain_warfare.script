@@ -201,14 +201,14 @@ manual_point = nil
 dbg_hud = false
 dbg_show_invasion_source = false                -- debug: show red circle on bases that are planning an invasion
 
-local guard_size = 1                            -- number of squads to keep at a base when an invasion is sent out
+guard_size = 1                                  -- number of squads to keep at a base when an invasion is sent out
 local BASE_INTAKE_SLACK = 0                     -- headroom above the occupancy cap when picking a destination base.
                                                 -- 0 leaves a hysteresis band of exactly one squad: a base at capacity
                                                 -- neither accepts nor evicts. Any higher value guarantees that a base
                                                 -- sitting at capacity accepts a squad and immediately evicts it again.
 local GUEST_SLOTS = 2                           -- loner/ecolog squads a non-enemy foreign base hosts at once, outside its garrison
-local currently_surge = false
-local reset_defense_timer = {}
+currently_surge = false
+reset_defense_timer = {}
 local previous_owner = {}                                        -- have to use this, since using smart.last_owner messes with the pda icons
 
 defense_timers = {}
@@ -298,13 +298,13 @@ max_resource_count = {
 local original_target = {}
 local surge_checker1 = {}
 local surge_checker2 = {}
-local invasion_defense_timers = {}
-local invasion_defense_next_update = {}
+invasion_defense_timers = {}
+invasion_defense_next_update = {}
 local base_recheck = {}                            -- used to keep track of base count of a faction. If they decrease compared to last time it was checked, targets are re-scanned
 local ceasefire_check = {}                        -- used to keep track if a faction changes from enemy to neutral across update cycles. Prevents immediate relation deterioration upon ceasefire
-local reinforcements_requested = {}                -- bases will only request reinforcements once per incoming attack to ease computational load
+reinforcements_requested = {}                      -- bases will only request reinforcements once per incoming attack to ease computational load
 local night_activity_allowed = {}                -- night activity is cleared once per night on a per-smart basis
-local actor_informed = {}                        -- Players on the same level of an allied defending point will be notified one time about the attack
+actor_informed = {}                              -- Players on the same level of an allied defending point will be notified one time about the attack
 
 
 -- if has_alife_info("bar_deactivate_radar_done") then  --- method to determine scorcher status
@@ -393,7 +393,7 @@ pda_icons = {
 -- [3] = medic count
 -- [4] = barman count
 -- [5] = leader count
-local uniques = {
+uniques = {
     ["mar_smart_terrain_base"] = { 1, 1, 1, 1, 1 },
     ["mar_smart_terrain_3_3"]  = { 1, 1, 1, 1, 0 },
     ["ds2_domik_st"]           = { 1, 1, 0, 0, 0 },

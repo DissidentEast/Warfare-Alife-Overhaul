@@ -21,9 +21,8 @@ function get_smart_types_string(smart)
     return table.concat(types, ", ")
 end
 
--- Common function to format seconds into "h m s" or "m s" or "s" format
+-- Common function to format game seconds into "h m s" or "m s" or "s" format
 function format_time_remaining(seconds)
-    seconds = seconds / 6
     if seconds <= 0 then
         return "Ready"
     elseif seconds < 60 then
@@ -669,7 +668,7 @@ function render_mutant_smart_info(smart)
             for _, behavior in ipairs(mutant_behavior) do
                 local status_text = "    " .. behavior.section .. ": " .. behavior.status
                 if behavior.wait_time then
-                    status_text = status_text .. " (" .. tostring(behavior.wait_time) .. "m wait"
+                    status_text = status_text .. " (" .. format_time_remaining(behavior.wait_time * 6) .. " wait"
                     if behavior.remaining then
                         status_text = status_text .. ", " .. format_time_remaining(behavior.remaining) .. " left"
                     end

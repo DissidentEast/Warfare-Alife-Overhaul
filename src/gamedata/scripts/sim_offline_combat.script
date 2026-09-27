@@ -28,7 +28,6 @@ local last_coordinator_time = nil
 
 -- When the distance between 2 enemy squads is below this value, they will fight [m^2]
 local COMBAT_DISTANCE = 20 * 20
-local COMBAT_DISTANCE_WARFARE = math.pow(ui_options.get("alife/warfare/general/offline_combat_distance"), 2)
 
 -- exclude special characters from the system and release their enemies, battles involving not_so_special communities will be ingored on the other hand
 local EXCLUDE_STORY_ID = true
@@ -699,7 +698,7 @@ local function coordinator()
 
     -- Options by mode
     if _G.WARFARE then
-        opt_dist = COMBAT_DISTANCE_WARFARE
+        opt_dist = math.pow(ui_options.get("alife/warfare/general/offline_combat_distance") or 50, 2)
         opt_exclude = EXCLUDE_STORY_ID_WARFARE
         can_fight_mutant = warfare_options.options.enable_mutant_offline_combat
         species_relations = true
@@ -891,7 +890,8 @@ function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1, pos_1)
     -- Only simulate for close squads
     local p1, p2 = pos_1 or squad_1.position, squad_2.position
     local dx, dz = p2.x - p1.x, p2.z - p1.z
-    if (dx * dx + dz * dz >= opt_dist) then
+    local dist_sqr = dx * dx + dz * dz
+    if (dist_sqr >= opt_dist) then
         return false
     end
 
@@ -1020,7 +1020,7 @@ function validate_enemy(sim, lid, squad_1, id_1, id_2, community_1, pos_1)
     last_combat_time[id_1] = warfare.get_time()
 
     -- Simulate battle
-    warfare_log.debug("validate_enemy: engage squad_1=%s squad_2=%s dist_sqr=%s rounds=%s", id_1, id_2, d, rounds)
+    warfare_log.debug("validate_enemy: engage squad_1=%s squad_2=%s dist_sqr=%s rounds=%s", id_1, id_2, dist_sqr, rounds)
     simulate_battle(id_1, id_2, squad_1, squad_2, community_1, community_2, lid, rounds)
 
     return true

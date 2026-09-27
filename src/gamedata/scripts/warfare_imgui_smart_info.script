@@ -386,7 +386,8 @@ function render_faction_smart_info(smart, faction)
             local lerp_span = base_count_total - 1
             local lerp_factor = lerp_span >= 1 and math.min(math.max((faction_bases - 1) / lerp_span, 0), 1) or 0
             local calculated_respawn = warfare.lerp and warfare.lerp(min_respawn, max_respawn, lerp_factor) or min_respawn
-            local spawn_mult = warfare_options.options.spawn_speed_multiplier or 1
+            -- options.spawn_speed_multiplier stores 1 / slider value; show the slider value.
+            local spawn_mult = 1 / (warfare_options.options.spawn_speed_multiplier or 1)
             local final_respawn = smart_terrain_warfare.get_current_def_respawn_interval(faction)
 
             ImGui.Text("  Min Respawn Time: " .. format_time_remaining(min_respawn  * 6))
@@ -895,8 +896,9 @@ function render()
                 ImGui.Text("  Avg Enemy Distance: " .. string.format("%.0f units", avg_enemy_distance))
                 
                 -- Calculate defense factors
-                local defense_factor = warfare_options.options.factions[faction_owner].max_invasion_size
-                local retreat_factor = warfare_options.options.factions[faction_owner].min_invasion_size
+                local faction_opts = warfare_options.options.factions[faction_owner]
+                local defense_factor = faction_opts and faction_opts.max_invasion_size or 0
+                local retreat_factor = faction_opts and faction_opts.min_invasion_size or 0
                 local required_defense = total_enemy_power * defense_factor
                 local retreat_threshold = total_enemy_power * retreat_factor
                 

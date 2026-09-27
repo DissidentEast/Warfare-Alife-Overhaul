@@ -344,6 +344,7 @@ function ui_options.init_opt_coder()
         },
     }
 
+    local coded = {}
     local function code_option(gr, id, num)
         local path
         for i = 1, #gr do
@@ -351,6 +352,7 @@ function ui_options.init_opt_coder()
                 path = ui_options.cc(id, gr[i].id)
                 ui_options.opt_index[path] = ui_options.cc(num, i)
                 ui_options.opt_val[path] = gr[i].val
+                coded[path] = true
             end
         end
     end
@@ -377,6 +379,17 @@ function ui_options.init_opt_coder()
                     end
                 end
             end
+        end
+    end
+
+    -- Vanilla indexed its own warfare rows before they were replaced. A leftover id (a removed
+    -- option) points at whichever new row took its position, so a preset still carrying it
+    -- would be cached as that row's type under an id no page shows.
+    local prefix = ui_options.cc(ui_options.cc("alife", "warfare"), "")
+    for path in pairs(ui_options.opt_index) do
+        if (not coded[path]) and string.sub(path, 1, #prefix) == prefix then
+            ui_options.opt_index[path] = nil
+            ui_options.opt_val[path] = nil
         end
     end
 end

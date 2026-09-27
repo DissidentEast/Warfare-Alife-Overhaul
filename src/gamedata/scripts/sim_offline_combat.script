@@ -296,16 +296,16 @@ local function smart_terrain_on_update(smart)
                     -- Otherwise, scan for squads in the same map
                     local pos_1 = squad_1.position
                     local x1, z1 = pos_1.x, pos_1.z
+                    -- No last_x: online (validate_enemy rejects it) or not yet updated (picked up once it has).
                     for j, id_2 in pairs(tbl_smart) do
                         local x2 = last_x[id_2]
-                        local dx, dz = 0, 0
                         if x2 then
-                            dx, dz = x2 - x1, last_z[id_2] - z1
-                        end
-                        if (dx * dx + dz * dz < opt_dist) then
-                            in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
-                            if in_combat then
-                                return
+                            local dx, dz = x2 - x1, last_z[id_2] - z1
+                            if (dx * dx + dz * dz < opt_dist) then
+                                in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
+                                if in_combat then
+                                    return
+                                end
                             end
                         end
                     end
@@ -383,16 +383,16 @@ local function squad_on_update(squad_1)
             end
 
             -- Otherwise, scan for squads in the same map
+            -- No last_x: online (validate_enemy rejects it) or not yet updated (picked up once it has).
             for id_2, _ in pairs(squads_by_level[lid_1]) do
                 local x2 = last_x[id_2]
-                local dx, dz = 0, 0
                 if x2 then
-                    dx, dz = x2 - x1, last_z[id_2] - z1
-                end
-                if (dx * dx + dz * dz < opt_dist) then
-                    in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
-                    if in_combat then
-                        return
+                    local dx, dz = x2 - x1, last_z[id_2] - z1
+                    if (dx * dx + dz * dz < opt_dist) then
+                        in_combat = validate_enemy(sim, lid_1, squad_1, id_1, id_2, community_1, pos_1)
+                        if in_combat then
+                            return
+                        end
                     end
                 end
             end

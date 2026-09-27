@@ -834,8 +834,14 @@ function set_target(squad, target, force)
         squad.wait_time = nil
         squad.current_target_id = target
         squad.assigned_target_id = target
-        squad.registered_with_warfare = true
-        warfare.registered_squads[squad:get_squad_community()][squad.id] = target
+        local reg = warfare.registered_squads[squad:get_squad_community()]
+        if reg then
+            squad.registered_with_warfare = true
+            reg[squad.id] = target
+        else
+            warfare_log.warn("set_target: no registered_squads table for community %s (squad %s)",
+                squad:get_squad_community(), squad.id)
+        end
 
         if (obj:clsid() == clsid.smart_terrain) then
             obj:on_reach_target(squad)
@@ -843,11 +849,6 @@ function set_target(squad, target, force)
             -- Non-smart target (e.g. patrol hunt): ensure terrain masks are set
             -- so the engine pathfinder can build a route
             squad:set_location_types()
-        end
-
-        if not (squad.registered_with_warfare) then
-            squad.registered_with_warfare = true
-            warfare.registered_squads[squad:get_squad_community()][squad.id] = target
         end
 
         local sim = alife()

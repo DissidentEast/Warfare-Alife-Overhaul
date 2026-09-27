@@ -19,7 +19,7 @@ function get_auto_capture_status()
     status.has_bases = base_count > 0
     
     -- Check surge status
-    status.is_surge = currently_surge or false
+    status.is_surge = smart_terrain_warfare.currently_surge or false
     
     -- Check time restrictions (night/day)
     local current_hour = warfare_utils.get_warfare_hour()

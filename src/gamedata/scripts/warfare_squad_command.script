@@ -373,6 +373,7 @@ end
 
 function select(squad)
     if not squad then return end
+    if squad_detachment[squad.id] then return end -- members act as a group
     clear_point() -- mutual exclusion: a squad selection clears any point selection
     selected[squad.id] = true
     update_overlay(squad)

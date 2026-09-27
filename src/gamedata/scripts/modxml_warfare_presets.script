@@ -281,7 +281,13 @@ function current_value(id, v)
     return value
 end
 
---- Every leaf under alife/warfare, valued as the player currently sees it.
+-- Diagnostics, not gameplay: never baked into a saved preset.
+local PRESET_EXCLUDE = {
+    ["alife/warfare/general/log_level"] = true,
+    ["alife/warfare/general/enable_busyhands_tracer"] = true,
+}
+
+--- Every leaf under alife/warfare except PRESET_EXCLUDE, valued as the player currently sees it.
 local function snapshot()
     local leaves = warfare_leaves()
     if not leaves then
@@ -291,9 +297,11 @@ local function snapshot()
     local values = {}
     for i = 1, #leaves do
         local id = leaves[i].id
-        local value = current_value(id, leaves[i].opt)
-        if value ~= nil then
-            values[#values + 1] = { id = id, value = value }
+        if not PRESET_EXCLUDE[id] then
+            local value = current_value(id, leaves[i].opt)
+            if value ~= nil then
+                values[#values + 1] = { id = id, value = value }
+            end
         end
     end
 

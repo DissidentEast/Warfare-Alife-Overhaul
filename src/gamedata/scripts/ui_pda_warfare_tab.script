@@ -260,14 +260,14 @@ function pda_warfare_tab:Reset()
         self.txt_order[f] = xml:InitTextWnd("faction:text_order", _st)
         self.txt_order[f]:SetText(n)
         
-        local str_squads = self.curr_map and self.faction_squads_lvl[f] or self.faction_squads[f] or 0
+        local str_squads = self.curr_map and (self.faction_squads_lvl[f] or 0) or (self.faction_squads[f] or 0)
         local str_patrols = self.curr_map and (self.faction_patrols_lvl[f] or 0) or (self.faction_patrols[f] or 0)
         local str_rpatrols = self.curr_map and (self.faction_random_patrols_lvl[f] or 0) or (self.faction_random_patrols[f] or 0)
         local str_regular = str_squads - str_patrols - str_rpatrols
         self.txt_squads[f] = xml:InitTextWnd("faction:info_squads", _st)
         self.txt_squads[f]:SetText(game.translate_string("ui_st_pda_warfare_squads") .. ": " .. clr_gr .. str_squads .. "(" .. str_regular .. "/" .. str_patrols .. "/" .. str_rpatrols .. ")")
         
-        local str_smarts = self.curr_map and self.faction_smarts_lvl[f] or self.faction_smarts[f] or 0
+        local str_smarts = self.curr_map and (self.faction_smarts_lvl[f] or 0) or (self.faction_smarts[f] or 0)
         local faction_resources_modifier = warfare_options.options.factions[f].resource_count_modifier or 0
         -- owned_* is the holdings count before enemy_*_boost and the *_count_modifier options;
         -- subtracting the modifier off the boosted count would still leave enemy_*_boost in.
@@ -336,7 +336,7 @@ function pda_warfare_tab:Update()
         if (v and v:IsCursorOverWindow()) then
             local str = game.translate_string("ui_st_pda_warfare_dominance")
             local str_fac = game.translate_string("st_dyn_news_comm_" .. f .. "_7")
-            local str_fac_smarts = self.curr_map and self.faction_smarts_lvl[f] or self.faction_smarts[f] or 0
+            local str_fac_smarts = self.curr_map and (self.faction_smarts_lvl[f] or 0) or (self.faction_smarts[f] or 0)
             local str_all_smarts = self.curr_map and self.tot_smarts_lvl or self.tot_smarts
             local str_extra = self.curr_map and game.translate_string(level.name()) or game.translate_string("ui_st_pda_warfare_zone")
             local str_faction_base_count = warfare_factions.faction_information[f].owned_base_count or 0

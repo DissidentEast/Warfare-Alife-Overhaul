@@ -101,3 +101,55 @@ guards_spawner.spawn_guard = function()
     end
     guards_spawner.pr("---------------------------------------------")
 end
+
+-- Story-NPC shield: a listed NPC keeps its NPC/monster damage cut only in story mode while not an
+-- enemy of the actor; otherwise NPCs and monsters hit it at that mod's player rate.
+-- Must install at load time, before the mods' on_game_start registers npc_on_before_hit.
+
+local function is_shielded(npc)
+    return IsStoryMode() and not game_relations.is_factions_enemies(get_actor_true_community(), character_community(npc))
+end
+
+local function is_unshielded_npc_hit(npc, s_hit)
+    if not _G.WARFARE then
+        return false
+    end
+    local draftsman = s_hit.draftsman
+    return draftsman and draftsman:id() ~= AC_ID and not is_shielded(npc) or false
+end
+
+local grok = grok_additional_storyline_npc_invincible
+if grok and grok.ads_npcs then
+    local grok_npc_on_before_hit = grok.npc_on_before_hit
+    -- Runs grok's player branch with the actor as draftsman. The engine applies draftsman back as
+    -- the hit source, so it must always be restored.
+    grok.npc_on_before_hit = function(npc, s_hit, bone_id, flags)
+        if npc and grok.ads_npcs[npc:section()] and is_unshielded_npc_hit(npc, s_hit) then
+            local draftsman = s_hit.draftsman
+            s_hit.draftsman = db.actor
+            local ok, e = pcall(grok_npc_on_before_hit, npc, s_hit, bone_id, flags)
+            s_hit.draftsman = draftsman
+            if not ok then
+                error(e, 0)
+            end
+            return
+        end
+        return grok_npc_on_before_hit(npc, s_hit, bone_id, flags)
+    end
+end
+
+local hxf = hxf_tough_important_npcs
+if hxf then
+    if hxf.IMPORTANT_NPC_SECTIONS and hxf.PLAYER_IMPORTANT_DMG then
+        local hxf_npc_on_before_hit = hxf.npc_on_before_hit
+        hxf.npc_on_before_hit = function(npc, s_hit, bone_id, flags)
+            if npc and hxf.IMPORTANT_NPC_SECTIONS[npc:section()] and not npc:has_info("npcx_is_companion") and is_unshielded_npc_hit(npc, s_hit) then
+                s_hit.power = s_hit.power * hxf.PLAYER_IMPORTANT_DMG
+                return
+            end
+            return hxf_npc_on_before_hit(npc, s_hit, bone_id, flags)
+        end
+    else
+        warfare_log.warn("gamma_patch: hxf_tough_important_npcs locals not unlocalized, story-NPC shield left off for it")
+    end
+end

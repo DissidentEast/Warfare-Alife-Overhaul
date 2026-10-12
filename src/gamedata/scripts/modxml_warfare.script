@@ -1,3 +1,13 @@
+-- init_opt_coder can run twice on one tree (Modded Exes re-runs it), so list choices are added once.
+local function add_choice(row, value)
+    for _, choice in ipairs(row.content) do
+        if choice[1] == value then
+            return
+        end
+    end
+    table.insert(row.content, { value })
+end
+
 local old_ui_options_init_opt_coder = ui_options.init_opt_coder
 function ui_options.init_opt_coder()
     warfare_log.debug("modxml_warfare.init_opt_coder: injecting warfare options into MCM tree")
@@ -17,13 +27,13 @@ function ui_options.init_opt_coder()
     local alife_general_options = ui_options.options[alife_options_index].gr[alife_general_options_index]
     local alife_general_alife_mutant_pop = alife_general_options.gr[alife_general_alife_mutant_pop_index]
     alife_general_alife_mutant_pop.def = 1.5
-    table.insert(alife_general_alife_mutant_pop.content, { 1.5 })
-    table.insert(alife_general_alife_mutant_pop.content, { 2 })
-    table.insert(alife_general_alife_mutant_pop.content, { 3 })
+    add_choice(alife_general_alife_mutant_pop, 1.5)
+    add_choice(alife_general_alife_mutant_pop, 2)
+    add_choice(alife_general_alife_mutant_pop, 3)
     local alife_general_alife_stalker_pop = alife_general_options.gr[alife_general_alife_stalker_pop_index]
     alife_general_alife_stalker_pop.def = 1
-    table.insert(alife_general_alife_stalker_pop.content, { 1.5 })
-    table.insert(alife_general_alife_stalker_pop.content, { 2 })
+    add_choice(alife_general_alife_stalker_pop, 1.5)
+    add_choice(alife_general_alife_stalker_pop, 2)
 
     local options = modxml_warfare_ui.build_sections({
         -- The behavior traits. Every row is checked against warfare_behavior.TRAITS after
@@ -344,9 +354,8 @@ function ui_options.init_opt_coder()
         },
     }
 
-    -- No warfare_presets flag: the ZCP page belongs to ZCP and gets no preset bar.
-    -- Modded Exes runs init_opt_coder again on the same tree (ui_options_modded_exes), so the page
-    -- takes its existing slot rather than being appended twice.
+    -- No warfare_presets flag: the ZCP page belongs to ZCP and gets no preset bar. On a second
+    -- init_opt_coder run it takes its existing slot rather than being appended again.
     local zcp_page = modxml_warfare_zcp.build_page(ui_options.cc("alife", "warfare"))
     if zcp_page then
         local slot = #warfare_options.gr + 1

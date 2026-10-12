@@ -2,16 +2,21 @@
 -- Each hook is installed only when the function it wraps exists, and every ZCP hook passes through
 -- to the original outside warfare games.
 --
--- With the zcp_mutant_spawns option on, warfare's own mutant pick is handed to ZCP as the original
--- spawn and ZCP keeps or replaces it (1:1, so warfare's caps still hold), and ZCP sizes those
--- mutant squads. With it off, ZCP's species filter and variant swaps are skipped for squads
--- warfare creates.
+-- ZCP acts on warfare only while its own master switch (smr_enabled) is on. Then, with the
+-- zcp_mutant_spawns option on, warfare's own mutant pick is handed to ZCP as the original spawn and
+-- ZCP keeps or replaces it (1:1, so warfare's caps still hold), and ZCP sizes those mutant squads;
+-- and ZCP's population factors are warfare's. Otherwise ZCP's species filter, variant swaps and
+-- sizing are skipped for squads warfare creates, and warfare reads Anomaly's population settings.
 
 local creating = false    -- a warfare squad is being created
 local routing = false     -- ZCP is choosing a warfare mutant squad
 
+local function zcp_enabled()
+    return smr_amain_mcm.get_config("smr_enabled") and true or false
+end
+
 local function zcp_drives_mutants()
-    return warfare_options.options.zcp_mutant_spawns and true or false
+    return warfare_options.options.zcp_mutant_spawns and zcp_enabled() or false
 end
 
 local function bypass_filters()
@@ -82,7 +87,7 @@ local function patch_member_filters_14()
             if not IsWarfare() then
                 return orig(squad, spawn_smart)
             end
-            if bypass_filters() or not smr_amain_mcm.get_config("smr_enabled") then
+            if bypass_filters() or not zcp_enabled() then
                 return
             end
             for _, se_obj in ipairs(members(squad)) do
@@ -235,6 +240,25 @@ local function checked_squad(squad, section)
     return squad
 end
 
+-- ZCP's factors while it is enabled, Anomaly's otherwise (ZCP's own rule).
+local function patch_pop_factors()
+    local orig_stalker = warfare.get_stalker_pop_factor_value
+    warfare.get_stalker_pop_factor_value = function()
+        if zcp_enabled() then
+            return smr_amain_mcm.get_config("stalker_pop_factor")
+        end
+        return orig_stalker()
+    end
+
+    local orig_monster = warfare.get_monster_pop_factor_value
+    warfare.get_monster_pop_factor_value = function()
+        if zcp_enabled() then
+            return smr_amain_mcm.get_config("monster_pop_factor")
+        end
+        return orig_monster()
+    end
+end
+
 local function patch_warfare_create()
     local orig = warfare.create_squad
     warfare.create_squad = function(section, smart)
@@ -261,5 +285,6 @@ function on_game_start()
     patch_member_filters_15()
     patch_warfare_members_15()
     patch_zombie_roll()
+    patch_pop_factors()
     patch_warfare_create()
 end

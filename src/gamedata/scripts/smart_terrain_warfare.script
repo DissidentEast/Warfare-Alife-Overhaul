@@ -3922,12 +3922,14 @@ function spawn_mutants(smart)
         if not spawned then
             local section = faction_expansions.get_spawn_section("monster", rare_chance, current_level)
             local squad = warfare.spawn_squad(section, smart:name())
-            warfare_log.info("spawn_mutants: spawned new mutant section=%s smart=%s",
-                tostring(section), smart:name())
-            sim_squad_warfare.set_target(squad, smart.id)
-            -- update squads_by_level so other smarts in the same cycle see accurate count
-            if squad and sim_offline_combat.squads_by_level[current_level] then
-                sim_offline_combat.squads_by_level[current_level][squad.id] = true
+            if squad then
+                warfare_log.info("spawn_mutants: spawned new mutant section=%s smart=%s",
+                    tostring(section), smart:name())
+                sim_squad_warfare.set_target(squad, smart.id)
+                -- update squads_by_level so other smarts in the same cycle see accurate count
+                if sim_offline_combat.squads_by_level[current_level] then
+                    sim_offline_combat.squads_by_level[current_level][squad.id] = true
+                end
             end
         end
     end

@@ -49,6 +49,10 @@ local function cap_id(id)
 end
 
 local function row_label(path, row)
+    local zcp = modxml_warfare_zcp.caption(ui_options.cc(path, row.id))
+    if zcp then
+        return game.translate_string(zcp.label)
+    end
     return game.translate_string("ui_mm_" .. (row.hint or cap_id(ui_options.cc(path, row.id))))
 end
 
@@ -58,7 +62,15 @@ local cap_desc = {}
 local ui_options_UIOptions_register_cap = ui_options.UIOptions.Register_Cap
 function ui_options.UIOptions.Register_Cap(self, xml, handler, id, hint)
     local h = ui_options_UIOptions_register_cap(self, xml, handler, id, hint)
-    if hint then
+    -- ZCP rows carry ZCP's MCM strings, which the "ui_mm_" naming cannot reach.
+    local zcp = modxml_warfare_zcp.caption(id)
+    if zcp then
+        self._Cap[cap_id(id)]:TextControl():SetText(game.translate_string(zcp.label))
+        local desc = game.translate_string(zcp.desc)
+        if desc ~= zcp.desc then
+            cap_desc[cap_id(id)] = desc
+        end
+    elseif hint then
         local str = "ui_mm_" .. hint .. "_desc"
         local desc = game.translate_string(str)
         if desc ~= str then

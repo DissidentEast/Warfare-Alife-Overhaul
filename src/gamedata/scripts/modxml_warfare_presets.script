@@ -264,7 +264,8 @@ local function collect(node, path, out)
         local e = gr[i]
         if e.gr then
             collect(e, ui_options.cc(path, e.id), out)
-        elseif e.id and e.type and ui_options.allowed_type[e.type] then
+        -- A row with curr stores its value in another mod (the ZCP page); presets never carry it.
+        elseif e.id and e.type and ui_options.allowed_type[e.type] and not e.curr then
             out[#out + 1] = { id = ui_options.cc(path, e.id), opt = e }
         end
     end
@@ -403,7 +404,7 @@ local function apply_preset(self, slug)
         local _, id, value = ini:r_line(slug, i, "", "")
 
         local v = ui_options.get_opt_table(id)
-        if v and v.type then
+        if v and v.type and not v.curr then
             -- Collapsed (wf_collapsible) rows still take the preset; only real preconditions skip.
             local to_hide = (not v.wf_collapsible)
                 and v.precondition and (not ui_options.exec(unpack(v.precondition)))

@@ -94,7 +94,7 @@
 		<text>Mutant spawns follow ZCP</text>
 	</string>
 	<string id="ui_mm_alife_warfare_general_zcp_mutant_spawns_desc">
-		<text>With Zone Customization Project installed, ZCP decides which mutants warfare spawns: its random-mutant chance, spawn templates or balanced tables, species and variant toggles, and mutant squad size. Warfare still decides where, when and how many.\nOff: warfare picks its own mutants and ZCP leaves them alone. No effect without ZCP.</text>
+		<text>With Zone Customization Project installed and enabled, ZCP decides which mutants warfare spawns: its random-mutant chance, spawn templates or balanced tables, species and variant toggles, and mutant squad size. Warfare still decides where, when and how many. The ZCP settings that matter are on the ZCP page.\nOff: warfare picks its own mutants and ZCP leaves them alone. No effect without ZCP or while ZCP is disabled.</text>
 	</string>
 	<string id="ui_mm_alife_warfare_general_prevent_mainbase_attacks">
 		<text>Protect Original Main Bases from Attack</text>
@@ -783,5 +783,35 @@
 		%c[pda_white]• %c[ui_gray_2]Command your faction through the PDA map.\n
 		%c[ui_red]• %c[ui_gray_2]NOT compatible with Survival mode.
 		</text>
+	</string>
+	<string id="ui_mm_menu_zcp">
+		<text>ZCP</text>
+	</string>
+	<string id="ui_mm_alife_warfare_zcp_note">
+		<text>Zone Customization Project's own settings, limited to the ones that affect warfare. Changing them here changes them in ZCP's menu as well, and in games without warfare. They act on warfare only while ZCP is enabled.\nSpecies and variant changes take effect after the next save is loaded. ZCP keeps its master switch and population factors in each save, so loading a save brings back that save's values.</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_spawns">
+		<text>Mutant choice</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_template">
+		<text>Spawn template</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_squad_size">
+		<text>Mutant squad size</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_species">
+		<text>Species</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_variants">
+		<text>Variants</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_population">
+		<text>Population</text>
+	</string>
+	<string id="ui_mm_alife_warfare_zcp_smr_enabled_desc">
+		<text>ZCP's master switch. Off: ZCP has no effect on warfare - no mutant choice, species, variants, squad size or population factors. It also turns ZCP's own loot, anomaly and fetch-task features on and off.</text>
+	</string>
+	<string id="ui_mm_alife_warfare_zcp_pop_factor_desc">
+		<text>While ZCP is enabled, warfare uses this factor instead of Anomaly's A-Life population setting. With ZCP off, warfare uses Anomaly's setting.</text>
 	</string>
 </string_table>

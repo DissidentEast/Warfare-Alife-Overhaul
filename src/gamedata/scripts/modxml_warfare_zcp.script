@@ -1,0 +1,155 @@
+-- The ZCP page of warfare's options: the Zone Customization Project settings that act on warfare,
+-- shown as rows that read and write ZCP's own MCM values. The rows own no storage (`curr`), so
+-- neither axr_options' [options] section nor warfare presets ever hold them. No page without ZCP.
+
+PAGE_ID = "zcp"
+
+-- Section layout: { id, featured ids, rows as { MCM page, id } }. Rows the installed ZCP version
+-- lacks are left out; a section left without rows is not built.
+local SECTIONS = {
+    { id = "zcp_spawns", featured = { "smr_enabled", "random_mutants" }, rows = {
+        { "smr_amain", "smr_enabled" },
+        { "smr_mutants", "random_mutants" },
+        { "smr_mutants", "random_mutants_chance" },
+        { "smr_mutants", "balanced_mutants" },
+    } },
+    { id = "zcp_template", featured = { "preset_apply_random" }, rows = {
+        { "smr_spawns", "preset_apply_random" },
+        { "smr_spawns", "preset_file" },
+        { "smr_spawns", "preset_week0_tier1" }, { "smr_spawns", "preset_week0_tier2" }, { "smr_spawns", "preset_week0_tier3" },
+        { "smr_spawns", "preset_week1_tier1" }, { "smr_spawns", "preset_week1_tier2" }, { "smr_spawns", "preset_week1_tier3" },
+        { "smr_spawns", "preset_week2_tier1" }, { "smr_spawns", "preset_week2_tier2" }, { "smr_spawns", "preset_week2_tier3" },
+        { "smr_spawns", "preset_week3_tier1" }, { "smr_spawns", "preset_week3_tier2" }, { "smr_spawns", "preset_week3_tier3" },
+    } },
+    { id = "zcp_squad_size", featured = { "squad_size" }, rows = {
+        { "smr_mutants", "squad_size" },
+        { "smr_mutants", "squad_size_variance" },
+    } },
+    { id = "zcp_species", featured = {}, rows = "species" },
+    { id = "zcp_variants", featured = { "unused_types_chance" }, rows = "variants" },
+    { id = "zcp_population", featured = { "monster_pop_factor", "stalker_pop_factor" }, rows = {
+        { "smr_amain", "monster_pop_factor" },
+        { "smr_amain", "stalker_pop_factor" },
+    } },
+}
+
+-- ZCP ships no description for these; warfare's text explains what they do here.
+local DESC = {
+    smr_enabled = "ui_mm_alife_warfare_zcp_smr_enabled_desc",
+    monster_pop_factor = "ui_mm_alife_warfare_zcp_pop_factor_desc",
+    stalker_pop_factor = "ui_mm_alife_warfare_zcp_pop_factor_desc",
+}
+
+-- options path -> { label = string id, desc = string id }
+local captions = {}
+
+function get(mcm_path)
+    return ui_mcm.get(mcm_path)
+end
+
+function set(mcm_path, opt_path)
+    local value = ui_options.opt_temp[opt_path]
+    if value ~= nil then
+        ui_mcm.set(mcm_path, value)
+    end
+end
+
+--- Label and tooltip string ids for a ZCP row, by its options path; nil for any other row.
+function caption(opt_path)
+    return captions[opt_path]
+end
+
+-- page id -> { id -> ZCP row table }, plus the mutant page's species and variant checkbox ids.
+local function zcp_definitions()
+    local pages, ordered = {}, {}
+    local sources = { smr_amain = smr_amain_mcm, smr_mutants = smr_mutants_mcm, smr_spawns = smr_spawns_mcm }
+    for page, script in pairs(sources) do
+        if script and script.on_mcm_load then
+            local def = script.on_mcm_load()
+            local by_id = {}
+            for _, row in ipairs(def and def.gr or {}) do
+                by_id[row.id] = row
+            end
+            pages[page] = by_id
+            ordered[page] = def and def.gr or {}
+        end
+    end
+
+    -- ZCP's own order: checkboxes before its unused-types note are species, the ones after are variants.
+    local species, variants = {}, {}
+    local after_note = false
+    for _, row in ipairs(ordered.smr_mutants or {}) do
+        if row.id == "unused_types_info" then
+            after_note = true
+        elseif row.type == "check" and string.sub(row.id, -1) == "p" then
+            local list = after_note and variants or species
+            list[#list + 1] = { "smr_mutants", row.id }
+        end
+    end
+    if pages.smr_mutants and pages.smr_mutants.unused_types_chance then
+        table.insert(variants, 1, { "smr_mutants", "unused_types_chance" })
+    end
+
+    return pages, { species = species, variants = variants }
+end
+
+local function proxy_row(page_path, page, src)
+    local mcm_path = "SMR/" .. page .. "/" .. src.id
+    local opt_path = ui_options.cc(page_path, src.id)
+    local label = "ui_mcm_" .. string.gsub(mcm_path, "/", "_")
+    captions[opt_path] = { label = label, desc = DESC[src.id] or (label .. "_desc") }
+
+    local row = {
+        id = src.id, type = src.type, val = src.val, def = src.def,
+        min = src.min, max = src.max, step = src.step, prec = src.prec,
+        curr = { get, mcm_path },
+        functor = { set, mcm_path, opt_path },
+    }
+    -- On a list no_str shows labels untranslated; on a slider it would hide the value.
+    if src.type == "list" then
+        row.content = src.content
+        row.no_str = src.no_str
+    end
+    return row
+end
+
+--- The ZCP page for alife/warfare, or nil when ZCP is not installed.
+function build_page(warfare_path)
+    if not (smr_amain_mcm and smr_mutants_mcm) then
+        return nil
+    end
+
+    local page_path = ui_options.cc(warfare_path, PAGE_ID)
+    local pages, generated = zcp_definitions()
+    local sections = {}
+    for _, spec in ipairs(SECTIONS) do
+        local refs = type(spec.rows) == "string" and generated[spec.rows] or spec.rows
+        local rows, present = {}, {}
+        for _, ref in ipairs(refs) do
+            local src = pages[ref[1]] and pages[ref[1]][ref[2]]
+            if src and not present[src.id] then
+                rows[#rows + 1] = proxy_row(page_path, ref[1], src)
+                present[src.id] = true
+            end
+        end
+        if #rows > 0 then
+            local featured = {}
+            for _, id in ipairs(spec.featured) do
+                if present[id] then
+                    featured[#featured + 1] = id
+                end
+            end
+            sections[#sections + 1] = { id = spec.id, featured = featured, rows = rows }
+        end
+    end
+
+    warfare_log.info("modxml_warfare_zcp.build_page: ZCP page with %s sections", #sections)
+    return {
+        id = PAGE_ID,
+        sh = true,
+        gr = modxml_warfare_ui.build_sections(sections, {
+            { id = "slide_zcp", type = "slide", link = "ui_options_slider_warfare", text = "ui_mm_menu_zcp", size = { 512, 50 } },
+            { id = "zcp_note", type = "desc", text = "ui_mm_alife_warfare_zcp_note", clr = { 255, 170, 170, 170 } },
+        }),
+    }
+end

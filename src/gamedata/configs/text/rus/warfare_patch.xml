@@ -94,7 +94,7 @@
 		<text>Мутанты по правилам ZCP</text>
 	</string>
 	<string id="ui_mm_alife_warfare_general_zcp_mutant_spawns_desc">
-		<text>Если установлен Zone Customization Project, каких мутантов выпускать в логова, решает ZCP: шанс случайных мутантов, шаблоны или сбалансированные таблицы, включённые виды, вариации и размер групп мутантов. Где, когда и сколько, по-прежнему определяет Warfare.\nЕсли выключить, Warfare сам подбирает мутантов, а ZCP их не трогает. Без ZCP ни на что не влияет.</text>
+		<text>Если установлен и включён Zone Customization Project, каких мутантов выпускать в логова, решает ZCP: шанс случайных мутантов, шаблоны или сбалансированные таблицы, включённые виды, вариации и размер групп мутантов. Где, когда и сколько, по-прежнему определяет Warfare. Нужные для этого настройки ZCP собраны на странице ZCP.\nЕсли выключить, Warfare сам подбирает мутантов, а ZCP их не трогает. Без ZCP или при выключенном ZCP ни на что не влияет.</text>
 	</string>
 	<string id="ui_mm_alife_warfare_general_prevent_mainbase_attacks">
 		<text>Предотвращение атак на главные базы</text>
@@ -781,5 +781,35 @@
 			\n%c[200,150,50,200]• %c[0,150,150,150]Автором перевода и его адаптации для версии 2.4 является av661194.
 			\n%c[200,200,50,50]• %c[0,150,150,150]Несовместимо с режимом «Выживание».
 		</text>
+	</string>
+	<string id="ui_mm_menu_zcp">
+		<text>ZCP</text>
+	</string>
+	<string id="ui_mm_alife_warfare_zcp_note">
+		<text>Здесь только те настройки Zone Customization Project, которые влияют на Warfare. Это настройки самого ZCP: всё, что меняется здесь, меняется и в его меню, и в играх без Warfare. На Warfare они действуют, только пока ZCP включён.\nВиды и вариации мутантов начинают работать после загрузки сохранения. Главный выключатель ZCP и множители населения ZCP хранит в каждом сохранении, поэтому при загрузке они возвращаются к значениям из него.</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_spawns">
+		<text>Выбор мутантов</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_template">
+		<text>Шаблон спавна</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_squad_size">
+		<text>Размер групп мутантов</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_species">
+		<text>Виды</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_variants">
+		<text>Вариации</text>
+	</string>
+	<string id="ui_mm_alife_warfare_sec_zcp_population">
+		<text>Население</text>
+	</string>
+	<string id="ui_mm_alife_warfare_zcp_smr_enabled_desc">
+		<text>Главный выключатель ZCP. Если его выключить, ZCP никак не влияет на Warfare: ни на выбор мутантов, ни на виды, вариации, размер групп и население. Он же включает и выключает собственные функции ZCP: лут, аномалии и задания на поиск предметов.</text>
+	</string>
+	<string id="ui_mm_alife_warfare_zcp_pop_factor_desc">
+		<text>Пока ZCP включён, Warfare берёт этот множитель вместо настройки населения A-Life из Anomaly. Если ZCP выключен, Warfare берёт настройку Anomaly.</text>
 	</string>
 </string_table>

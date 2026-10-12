@@ -344,6 +344,21 @@ function ui_options.init_opt_coder()
         },
     }
 
+    -- No warfare_presets flag: the ZCP page belongs to ZCP and gets no preset bar.
+    -- Modded Exes runs init_opt_coder again on the same tree (ui_options_modded_exes), so the page
+    -- takes its existing slot rather than being appended twice.
+    local zcp_page = modxml_warfare_zcp.build_page(ui_options.cc("alife", "warfare"))
+    if zcp_page then
+        local slot = #warfare_options.gr + 1
+        for i, page in ipairs(warfare_options.gr) do
+            if page.id == zcp_page.id then
+                slot = i
+                break
+            end
+        end
+        warfare_options.gr[slot] = zcp_page
+    end
+
     local coded = {}
     local function code_option(gr, id, num)
         local path

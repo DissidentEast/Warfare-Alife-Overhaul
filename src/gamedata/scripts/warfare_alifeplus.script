@@ -57,11 +57,11 @@ function reclaim_from_ap(squad)
         warfare_log.debug("reclaim_from_ap: squad=%s not AP-controlled, nothing to reclaim", tostring(squad and squad.id))
         return false
     end
-    if type(ap_core_broker.release_squad) ~= "function" then
+    if not ap_api.release_squad then
         warfare_log.warn("reclaim_from_ap: AlifePlus present but release_squad unavailable; cannot reclaim squad=%s", tostring(squad.id))
         return false
     end
-    local ok = ap_core_broker.release_squad(squad.id)
+    local ok = ap_api.release_squad(squad.id)
     warfare_log.info("reclaim_from_ap: squad=%s released from AlifePlus control (result=%s)", tostring(squad.id), tostring(ok))
     return ok
 end

@@ -28,7 +28,11 @@ jobs:
       - name: Read version and check tag
         id: version
         run: |
-          VERSION=$(cat version)
+          VERSION=$(sed -n 's/^VERSION = "\([^"]*\)".*/\1/p' src/gamedata/scripts/warfare.script)
+          if [ -z "${VERSION}" ]; then
+            echo "ERROR: no VERSION line in src/gamedata/scripts/warfare.script" >&2
+            exit 1
+          fi
           if [ -n "${{ github.event.inputs.version_tag }}" ]; then
             VERSION="${VERSION}-${{ github.event.inputs.version_tag }}"
           fi
@@ -68,7 +72,11 @@ jobs:
           cp -r patches build_temp/
           cp -r src build_temp/
           cp Installation_Instructions+Changelog.txt build_temp/
-      
+
+          FOMOD_INFO=build_temp/fomod/Info.xml
+          sed -i "s|<Version>.*</Version>|<Version>${{ steps.version.outputs.VERSION }}</Version>|" "$FOMOD_INFO"
+          grep -q "<Version>${{ steps.version.outputs.VERSION }}</Version>" "$FOMOD_INFO" || { echo "ERROR: failed to stamp version into $FOMOD_INFO" >&2; exit 1; }
+
           echo "? files to build:"
           ls -la build_temp/
 

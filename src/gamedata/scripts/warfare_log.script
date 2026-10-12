@@ -2,9 +2,10 @@
 ---
 --- Main logger (always on):
 ---   warfare_log.err / warn / info / debug / trace (fmt, ...)
+---   warfare_log.banner (fmt, ...) logs at any log_level except OFF.
 ---   string.format-style; output to $logs$/warfare.log, gated by MCM
----   "log_level" (OFF/ERROR/WARN/INFO/DEBUG/TRACE). ERROR and WARN also
----   mirror to xray_engine.log via printf.
+---   "log_level" (OFF/ERROR/WARN/INFO/DEBUG/TRACE). ERROR, WARN and INFO
+---   (banner included) also mirror to xray_engine.log via printf.
 ---
 --- Busyhands tracer (restart-required; for diagnosing engine-side crashes
 --- from invalid Lua calls):
@@ -195,6 +196,13 @@ function warn(fmt, ...)  _write(LEVEL.WARN,  fmt, ...) end
 function info(fmt, ...)  _write(LEVEL.INFO,  fmt, ...) end
 function debug(fmt, ...) _write(LEVEL.DEBUG, fmt, ...) end
 function trace(fmt, ...) _write(LEVEL.TRACE, fmt, ...) end
+
+--- One INFO line to warfare.log and xray_engine.log at any log_level except OFF.
+function banner(fmt, ...)
+    if _current_level == LEVEL.OFF then return end
+    _flush_dedup()
+    _emit_to_log(LEVEL.INFO, _format(fmt, ...))
+end
 
 function enabled()
     return _current_level >= LEVEL.DEBUG
@@ -605,6 +613,9 @@ local function _read_busyhands_flag()
     return ok and v == true
 end
 _busyhands_enabled = _read_busyhands_flag()
+
+-- axr_main runs on_game_start in file order: warfare.on_game_start logs before ours reads log_level.
+pcall(_read_settings)
 
 if _busyhands_enabled then
     _install_registration_hijacks()

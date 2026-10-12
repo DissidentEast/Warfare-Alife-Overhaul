@@ -15,6 +15,9 @@
 
 --]]
 
+-- The mod version: bump only here. Release CI reads this line for the tag, archive name and fomod/Info.xml.
+VERSION = "1.6.8"
+
 --_G.DEACTIVATE_SIM_ON_NON_LINKED_LEVELS = false
 --_G.ProcessEventQueueState = function() return end
 
@@ -1473,6 +1476,7 @@ function squad_on_unregister(squad, type_name)
 end
 
 function on_game_start()
+    warfare_log.banner("Warfare ALife Overhaul %s", VERSION)
     warfare_log.info("on_game_start: registering warfare callbacks")
     --_G.WARFARE = false
     warfare_options.update_settings()

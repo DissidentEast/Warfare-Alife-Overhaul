@@ -145,7 +145,7 @@ function ui_options.UIOptions.Update(self)
     ui_options_UIOptions_update(self)
     for id, h in pairs(headers) do
         local btn = self._Cap[id]
-        local hover = btn and btn:IsCursorOverWindow() or false
+        local hover = (not h.fixed) and btn and btn:IsCursorOverWindow() or false
         if hover ~= h.hover then
             h.hover = hover
             recolor(h)
@@ -354,16 +354,19 @@ function ui_options.UIOptions.Register_Button(self, xml, handler, path, opt, v, 
     end
 
     local wxml = get_mcm_xml()
-    local open = section_is_open(v.wf_section)
     local id_cap = cap_id(ui_options.cc(path, opt))
     local hidden = v.wf_hidden
+    -- A section whose rows are all featured has nothing to fold: plain header, no toggle.
+    local collapsible = #hidden > 0
+    local open = collapsible and section_is_open(v.wf_section)
 
     -- Measure the collapsed form in both states so the stretched rules do not move on toggle.
     local label = row_label(path, v)
-    if #hidden > 0 then
+    local closed = label
+    if collapsible then
         label = label .. " (" .. #hidden .. ")"
+        closed = "[+] " .. label
     end
-    local closed = "[+] " .. label
     local cap = wxml:InitStatic("sec_cap", handler)
     cap:TextControl():SetText(closed)
     local half = text_width(cap, closed) / 2 + GAP
@@ -376,7 +379,7 @@ function ui_options.UIOptions.Register_Button(self, xml, handler, path, opt, v, 
     local x1 = x0 + btn:GetWidth()
     place_rules(wxml, handler, x0, x1, half)
 
-    local h = { cap = cap, rows = v.wf_rows, dirty = section_dirty(path, v.wf_rows), hover = false }
+    local h = { cap = cap, rows = v.wf_rows, dirty = section_dirty(path, v.wf_rows), hover = false, fixed = not collapsible }
     headers[id_cap] = h
     recolor(h)
 
@@ -386,9 +389,11 @@ function ui_options.UIOptions.Register_Button(self, xml, handler, path, opt, v, 
 
     local id_ctrl = self:Stacker(path, opt, v)
     self:Register(btn, id_ctrl)
-    self:AddCallback(id_ctrl, ui_events.BUTTON_CLICKED, function()
-        self:Callback_Button(btn, path, opt, v)
-    end, self)
+    if collapsible then
+        self:AddCallback(id_ctrl, ui_events.BUTTON_CLICKED, function()
+            self:Callback_Button(btn, path, opt, v)
+        end, self)
+    end
 
     return SECTION_H
 end

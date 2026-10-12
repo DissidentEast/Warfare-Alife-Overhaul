@@ -1431,7 +1431,7 @@ end
 
 function on_game_start()
     warfare_log.info("sim_offline_combat.on_game_start")
-    if is_empty(ignore_list) or is_empty(health_table) or is_empty(story_id_communities) then
+    if is_empty(ignore_list) or is_empty(story_id_communities) then
         init_settings()
     end
 

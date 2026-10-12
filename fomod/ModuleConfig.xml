@@ -82,9 +82,6 @@ If using debug mode, may cause some issues with selecting the Warfare mapspot. U
                             <!--<designer.metadata.do.not.edit> {"name":"'Dynamic' addons"}-->
                             <description>
 Contains all patches for Gamma modpack compatibility.
-
-If you select this, select also these mods:
-LTTZ
                             </description>
                             <files>
                                 <folder source="patches\GAMMA Warfare Patch"
@@ -99,21 +96,6 @@ LTTZ
                 <group name="Patches" type="SelectAny">
                     <!--<designer.metadata.do.not.edit> {"name":"Patches"}-->
                     <plugins order="Explicit">
-                        <plugin name="LTTZ">
-                            <!--<designer.metadata.do.not.edit> {"name":"'Dynamic' addons"}-->
-                            <description>
-Compatibility with LTTZ (needed for Gamma).
-
-Adds squads from LTTZ.
-                            </description>
-                            <files>
-                                <folder source="patches\Patch for LTTZ Directors Cut"
-                                        destination="" priority="0" alwaysInstall="false" installIfUsable="false"/>
-                            </files>
-                            <typeDescriptor>
-                                <type name="Optional"/>
-                            </typeDescriptor>
-                        </plugin>
                         <plugin name="Alternative New Levels Layout">
                             <!--<designer.metadata.do.not.edit> {"name":"Alternative New Levels Layout"}-->
                             <description>

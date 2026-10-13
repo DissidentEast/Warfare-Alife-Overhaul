@@ -250,6 +250,26 @@ function spawn_squad(section, smart, kind)
     return squad
 end
 
+-- spawn_squad at a point instead of a smart. The squad is assigned to no smart;
+-- the caller gives it a target. May return nil.
+function spawn_squad_at(section, pos, lvid, gvid)
+    spawning_own = true
+    local squad = alife_create(section, pos, lvid, gvid)
+    if squad then
+        squad:create_npc(nil, pos, lvid, gvid)
+        local sim = alife()
+        for k in squad:squad_members() do
+            local se_obj = k.object or k.id and sim:object(k.id)
+            if se_obj then
+                SIMBOARD:setup_squad_and_group(se_obj)
+                SendScriptCallback("squad_on_npc_creation", squad, se_obj, nil)
+            end
+        end
+    end
+    spawning_own = false
+    return squad
+end
+
 ALL_OUT_WAR_RELATION = -2000
 
 function apply_all_out_war()
@@ -1606,6 +1626,15 @@ local function get_zombied_section(original_section)
     return "zombied_sim_squad_novice"
 end
 
+local emission_immune = { monster = true, zombied = true, monolith = true }
+
+local function smart_or_nil(id)
+    local se = id and alife_object(id)
+    if se and se:clsid() == clsid.smart_terrain then
+        return se
+    end
+end
+
 function snap()
     local mode = warfare_options.options.emission_effect
     if (not mode) or (mode == "off") then
@@ -1619,8 +1648,10 @@ function snap()
     -- Collect all squad IDs first — modifying registered_squads during pairs() is unsafe
     local to_process = {}
     for faction, tbl in pairs(registered_squads) do
-        for squad_id, _ in pairs(tbl) do
-            to_process[#to_process + 1] = { id = squad_id, faction = faction }
+        if not emission_immune[faction] then
+            for squad_id, _ in pairs(tbl) do
+                to_process[#to_process + 1] = { id = squad_id, faction = faction }
+            end
         end
     end
     warfare_log.debug("snap: collected %s candidate squads", #to_process)
@@ -1632,6 +1663,16 @@ function snap()
         local faction = entry.faction
 
         if squad and (math.random(100) <= p) then
+            -- Companions are never purged; online NPCs are left to the vanilla emission
+            if axr_companions.companion_squads[squad.id] then
+                warfare_log.trace("snap: skip companion squad=%s", squad:name())
+                goto continue
+            end
+            if squad.online then
+                warfare_log.trace("snap: skip online squad=%s", squad:name())
+                goto continue
+            end
+
             -- Skip squads defending a protected main base still held by their faction
             if warfare_options and warfare_options.options.prevent_mainbase_attacks then
                 local target_id = squad.current_target_id
@@ -1645,22 +1686,24 @@ function snap()
                 end
             end
 
-            if mode == "zombify" and faction ~= "zombied" and faction ~= "monster" then
+            if mode == "zombify" then
                 local original_count = squad:npc_count()
                 local original_section = squad:section_name()
-                local smart_id = squad.current_target_id or squad.smart_id
-                local smart_obj = smart_id and alife_object(smart_id)
-                local smart_name = smart_obj and smart_obj:name()
+                local pos = vector():set(squad.position)
+                local lvid = squad.m_level_vertex_id
+                local gvid = squad.m_game_vertex_id
+                local anchor = smart_or_nil(squad.smart_id) or smart_or_nil(squad.current_target_id)
 
                 sim_squad_warfare.remove_squad(squad)
                 squad:remove_squad()
 
-                -- Spawn zombied replacement as random patrol
-                if smart_name and original_count > 0 then
+                -- Spawn zombied replacement where the squad stood, as random patrol
+                if original_count > 0 then
                     local section = get_zombied_section(original_section)
-                    local new_squad = spawn_squad(section, smart_name)
+                    local new_squad = spawn_squad_at(section, pos, lvid, gvid)
                     if new_squad then
-                        warfare_log.trace("snap: zombified squad section=%s->%s smart=%s count=%s", original_section, section, smart_name, original_count)
+                        warfare_log.trace("snap: zombified squad section=%s->%s gvid=%s->%s lvid=%s->%s count=%s",
+                            original_section, section, gvid, new_squad.m_game_vertex_id, lvid, new_squad.m_level_vertex_id, original_count)
                         -- Trim zombie squad down to original member count
                         local excess = new_squad:npc_count() - original_count
                         if excess > 0 then
@@ -1677,7 +1720,7 @@ function snap()
                         end
                         -- Register as random patrol
                         smart_terrain_warfare.set_random_patrol(new_squad.id, "zombied")
-                        local patrol_target = smart_terrain_warfare.find_random_patrol_target(smart_obj, "zombied", new_squad.id)
+                        local patrol_target = smart_terrain_warfare.find_random_patrol_target(anchor, "zombied", new_squad.id)
                         if patrol_target then
                             sim_squad_warfare.set_target(new_squad, patrol_target)
                         else
@@ -1685,11 +1728,10 @@ function snap()
                         end
                         zombified = zombified + 1
                     else
-                        warfare_log.warn("snap: failed to spawn zombified replacement section=%s smart=%s", section, smart_name)
+                        warfare_log.warn("snap: failed to spawn zombified replacement section=%s gvid=%s lvid=%s", section, gvid, lvid)
                     end
                 end
             else
-                -- Kill mode (or zombify skips zombie/monster squads — just kill them)
                 warfare_log.trace("snap: kill squad=%s faction=%s", squad:name(), faction)
                 sim_squad_warfare.remove_squad(squad)
                 squad:remove_squad()

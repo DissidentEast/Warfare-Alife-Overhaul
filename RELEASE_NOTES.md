@@ -1,22 +1,23 @@
 ## What's Changed
 
 ### Features
-- Blind mode in the Map settings: the map shows only what you see yourself and what your PDA reveals. Squads, outposts and garrisons report nothing, your own faction included. It overrides fog of war, remembered owners still work from your own sightings, and a new game starts with every base unknown
-- A new game offers to simulate the Zone for up to 20 days before you start
-- ZCP compatibility is applied automatically for ZCP 1.4 and 1.5; the separate ZCP patch is gone
-- ZCP can choose Warfare's mutant spawns, behind a new setting
-- Offline fights between mutants and humans are decided by species relations
-- With ReDone Collection installed, main bases move to where it puts faction traders (untested)
-- In story mode Warfare squads stay off smarts locked by quests
-- Loners and ecologists rest as guests on bases of factions they are not at war with
+- The Renegade base in the Great Swamp now has a trader, mechanic, barman and medic, plus a workbench, a bar, a medic corner and a place to sleep
+- New ZCP page in the Warfare settings with the ZCP options that affect Warfare. Changing them there changes them in ZCP too, and presets never touch them
+- ZCP now affects Warfare only while ZCP is turned on, and Warfare then follows ZCP's population setting instead of Anomaly's
 
 ### Improvements
-- Performance pass: targeting, offline combat, fog of war and the simulation tick do much less work on busy saves
+- Emissions: a zombified squad now rises where it was caught instead of appearing at the place it was heading to. Your companions and squads near you are left to the game's own emission, and mutants, zombies and the Monolith are immune. Zombify is now the default emission effect
+- Time settings show in-game time everywhere. Your existing settings and presets are converted automatically
+- Presets from older versions are converted when you apply them, and you are asked before applying a preset from a newer version
 
 ### Bug Fixes
-- Fix Warfare's squad sizing never running
-- Fix mutant lairs re-sending the squad already there instead of the new one
-- Fix a crash in patrol attack rolls on a squad that no longer exists
-- Fix a base's own defense counting the distance power multiplier twice
-- Fix protected main bases passing to friendly factions
-- Remove the story/warfare incompatibility note from the new-game tooltips
+- Fix squads sometimes vanishing during an emission instead of turning into zombies
+- GAMMA: Warfare squads can now kill story characters who are your enemies. Those characters keep their protection from other NPCs and mutants only in story mode and only while they are not hostile to you
+- Fix the PDA's current-level view showing numbers for the whole Zone
+- Fix the PDA Warfare tab on maps with no bases or resources
+- Fix population choices being listed twice in the settings with Modded Exes
+- Fix being able to select a squad that is part of a detachment
+- The offline combat distance setting now applies without reloading
+
+### Installation
+- The LTTZ patch is gone from the installer: it had no effect. On GAMMA, the Gamma Patch is all you need

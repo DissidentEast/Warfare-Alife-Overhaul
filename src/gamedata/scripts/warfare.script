@@ -153,6 +153,8 @@ end
 
 -- Saved: all_out_war seeds the relation matrix once per game, never on a later load.
 all_out_war_applied = false
+-- Saved: the seed lives in the drx_df pstor vars vanilla restores on load.
+all_out_war_persisted = false
 dynamic_relations_installed = false
 
 -- Special squads to ignore in offline combat and to ignore when assigning targets
@@ -272,28 +274,32 @@ end
 
 ALL_OUT_WAR_RELATION = -2000
 
-function apply_all_out_war()
-    local r = ALL_OUT_WAR_RELATION
-    warfare_log.info("apply_all_out_war: setting all faction relations to %s (actor_faction=%s)", r, actor_faction)
-    for i, faction in pairs(warfare_factions.factions) do
-        for j, faction2 in pairs(warfare_factions.factions) do
-            if (faction ~= faction2) then
-                warfare_log.trace("apply_all_out_war: %s vs %s", faction, faction2)
-                game_relations.set_factions_community(faction, faction2, r)
+local function seed_all_out_war_pair(faction, faction2, only_missing)
+    if only_missing and load_var(db.actor, "drx_df_" .. faction .. "_" .. faction2 .. "_relations", nil) ~= nil then
+        return 0
+    end
+    warfare_log.trace("apply_all_out_war: %s vs %s", faction, faction2)
+    game_relations.save_relation(faction, faction2, ALL_OUT_WAR_RELATION)
+    return 1
+end
 
-                if (dynamic_relations_installed) then
-                    save_var(db.actor, ("drx_df_" .. faction .. "_" .. faction2 .. "_relations"), r)
-                    save_var(db.actor, ("drx_df_" .. faction2 .. "_" .. faction .. "_relations"), r)
-                end
-
-                if (actor_faction == faction) then
-                    game_relations.set_factions_community("actor_" .. faction, faction2, r)
-                elseif (actor_faction == faction2) then
-                    game_relations.set_factions_community(faction, "actor_" .. faction2, r)
-                end
-            end
+-- Must write through game_relations.save_relation: the engine reloads community relations from
+-- game_relations.ltx on every level load, and vanilla restores only the drx_df pstor vars.
+-- only_missing seeds just the pairs with no saved value, keeping the ones a load restores.
+function apply_all_out_war(only_missing)
+    local factions = warfare_factions.factions
+    local seeded = 0
+    for i = 1, #factions do
+        for j = i + 1, #factions do
+            local faction, faction2 = factions[i], factions[j]
+            seeded = seeded
+                + seed_all_out_war_pair(faction, faction2, only_missing)
+                + seed_all_out_war_pair("actor_" .. faction, faction2, only_missing)
+                + seed_all_out_war_pair(faction, "actor_" .. faction2, only_missing)
         end
     end
+    warfare_log.info("apply_all_out_war: set %s faction pairs to %s (only_missing=%s, actor_faction=%s)",
+        seeded, ALL_OUT_WAR_RELATION, only_missing, actor_faction)
 end
 
 -- table for registered squad ids
@@ -490,6 +496,7 @@ function save_state(m_data)
     m_data.warfare.actor_influence_points = actor_influence_points
     m_data.warfare.influence_levels = influence_levels
     m_data.warfare.all_out_war_applied = all_out_war_applied
+    m_data.warfare.all_out_war_persisted = all_out_war_persisted
     m_data.warfare.night_accumulated = night_accumulated
     m_data.warfare.was_night_wt = was_night_wt
     m_data.warfare.manual_control = pda_actor.manual_control
@@ -586,6 +593,7 @@ function load_state(m_data)
     actor_influence_points = m_data.warfare and m_data.warfare.actor_influence_points or 0
     influence_levels = m_data.warfare and m_data.warfare.influence_levels or {}
     all_out_war_applied = m_data.warfare and m_data.warfare.all_out_war_applied or false
+    all_out_war_persisted = m_data.warfare and m_data.warfare.all_out_war_persisted or false
     night_accumulated = m_data.warfare and m_data.warfare.night_accumulated or 0
     was_night_wt = m_data.warfare and m_data.warfare.was_night_wt or false
     pda_actor.manual_control = m_data.warfare and m_data.warfare.manual_control or false
@@ -822,9 +830,15 @@ function actor_on_update()
             warfare_log.info("actor_on_update: dynamic_relations detected")
         end
 
-        if (not all_out_war_applied and warfare_options.options.all_out_war) then
-            apply_all_out_war()
-            all_out_war_applied = true
+        if (warfare_options.options.all_out_war) then
+            if (not all_out_war_applied) then
+                apply_all_out_war()
+                all_out_war_applied = true
+            elseif (not all_out_war_persisted) then
+                -- a pair the old seed left unsaved was reset on load
+                apply_all_out_war(true)
+            end
+            all_out_war_persisted = true
         end
 
         build_level_information()

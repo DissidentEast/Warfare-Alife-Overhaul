@@ -132,8 +132,6 @@ function update_faction(faction)
         faction_information[faction].total_power = 0
         faction_information[faction].inactive_squads = 0
         faction_information[faction].active_squads = 0
-        faction_information[faction].faction_respawn = 0
-        faction_information[faction].patrol_respawn = 0
         faction_information[faction].invasion_size = 0
         faction_information[faction].patrol_pop_factor = 0
         faction_information[faction].last_resurgence_attempt = warfare.get_time()
@@ -173,8 +171,6 @@ function update_faction(faction)
         fi.total_power = 0
         fi.inactive_squads = 0
         fi.active_squads = 0
-        fi.faction_respawn = 0
-        fi.patrol_respawn = 0
         fi.invasion_size = 0
         fi.patrol_pop_factor = 0
         fi.last_resurgence_attempt = last_resurgence_attempt
@@ -220,10 +216,7 @@ function update_faction(faction)
         warfare_log.trace("update_faction: %s aggregated bases=%s resources=%s power=%s active=%s inactive=%s", tostring(faction), tostring(base_count), tostring(resource_count), tostring(fi.total_power), tostring(fi.active_squads), tostring(fi.inactive_squads))
 
         -- World totals are 0 until build_level_information has run.
-        local res_total = math.max(1, warfare.resource_count or 0)
         local base_total = math.max(1, warfare.base_count or 0)
-        local respawn = warfare.lerp(ff.max_faction_respawn, ff.min_faction_respawn, clamp(resource_count / res_total, 0, 1)) * spawn_mult
-        local patrol_respawn = warfare.lerp(ff.max_patrol_time, ff.min_patrol_time, clamp(resource_count / res_total, 0, 1)) * spawn_mult
         local invasion_size = warfare.lerp(ff.min_invasion_size, ff.max_invasion_size, clamp(base_count / base_total, 0, 1))
         local patrol_pop_factor = ff.patrol_squads
 
@@ -245,8 +238,6 @@ function update_faction(faction)
             end
         end
 
-        fi.faction_respawn = respawn
-        fi.patrol_respawn = patrol_respawn
         fi.invasion_size = invasion_size
         fi.patrol_pop_factor = patrol_pop_factor
 

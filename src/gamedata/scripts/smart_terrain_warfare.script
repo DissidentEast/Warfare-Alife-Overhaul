@@ -847,6 +847,7 @@ function smart_terrain_on_update(smart)
 
     process_manual_capture(smart)
     surge_behavior(smart)
+    process_random_patrols(smart)
 
     -- Process faction-owned smart terrain
     if (smart.owning_faction ~= "none" and warfare_options.options.factions[smart.owning_faction]) then
@@ -1407,18 +1408,6 @@ function process_base_squads(smart)
                 -- Second criterion: Squad movement happens in the morning. An invasion will have already been sent out via `process_targets()`, which happens before this function
                 local squad_sent = false
                 if isMorning or (night_activity_allowed[smart.id] == 1) then
-                    -- Retask random patrols during the day
-                    if (random_patrols[squad.id]) and (math.random(100) <= 20)
-                    and not sim_squad_warfare.squad_is_settled(squad) then
-                        -- 20% chance of moving after a given update
-                        local target = find_random_patrol_target(smart, faction, sid)
-                        if (target) then
-                            warfare_log.debug("process_base_squads: retask random patrol squad=%s -> target=%s",
-                                tostring(squad.id), tostring(target))
-                            sim_squad_warfare.set_target(squad, target)
-                        end
-                    end
-
                     -- If squad is the last squad on the base, do not command them
                     if (regular_squads + stationary_sq_num == guard_size) then
                         break
@@ -1602,6 +1591,42 @@ local function patrol_system_owns(squad)
 end
 
 
+function process_random_patrols(smart)
+--[[
+    Retask idle random patrols sitting on this smart, 20% chance each per pass.
+    Runs for every supported smart regardless of type or owner, so no smart can hold a
+    random patrol for good. At night patrols stay put unless the smart's night activity
+    roll succeeded. Loner/ecolog random patrols are left to process_independent.
+]]
+    if not (smart.patrol_retask_time) or (time_ref():diffSec(smart.patrol_retask_time) >= smart.next_patrol_retask_time) then
+        smart.patrol_retask_time = warfare.get_time()
+        smart.next_patrol_retask_time = math.random(30, 180)
+    else
+        return
+    end
+
+    if warfare_utils.is_night() and (night_activity_allowed[smart.id] ~= 1) then
+        return
+    end
+
+    for sid,_ in pairs(SIMBOARD.smarts[smart.id].squads) do
+        local faction = random_patrols[sid]
+        if faction and not warfare_behavior.is_independent(faction) then
+            local squad = resolve_roster_squad(smart.id, sid)
+            if squad and squad_is_commandable(squad, true) and (squad.current_action == 1)
+            and not sim_squad_warfare.squad_is_settled(squad) and (math.random(100) <= 20) then
+                local target = find_random_patrol_target(smart, faction, sid)
+                if target then
+                    warfare_log.debug("process_random_patrols: retask squad=%s faction=%s smart=%s -> target=%s",
+                        sid, faction, smart:name(), target)
+                    sim_squad_warfare.set_target(squad, target)
+                end
+            end
+        end
+    end
+end
+
+
 function process_nonbase_squads(smart, always_recall, keep_one)
 --[[
     Recall non-patrol faction squads from non-base terrains to their nearest bases.
@@ -1636,22 +1661,6 @@ function process_nonbase_squads(smart, always_recall, keep_one)
 
     if not always_recall then
         if not warfare_utils.is_night() or (night_activity_allowed[smart.id] == 1) then
-            -- Retask idle random patrols at non-base smarts before returning
-            local squads_peek = SIMBOARD.smarts[smart.id].squads
-            for sid_peek,_ in pairs(squads_peek) do
-                if random_patrols[sid_peek] then
-                    local sq = alife_object(sid_peek)
-                    if sq and sq.current_action == 1 and not sim_squad_warfare.squad_is_settled(sq) then
-                        local roll = math.random(100)
-                        if roll <= 20 then
-                            local target = find_random_patrol_target(smart, random_patrols[sid_peek], sid_peek)
-                            if target then
-                                sim_squad_warfare.set_target(sq, target)
-                            end
-                        end
-                    end
-                end
-            end
             return
         end
     end

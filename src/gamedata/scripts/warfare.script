@@ -1511,6 +1511,12 @@ function squad_on_unregister(squad, type_name)
     end
 end
 
+local function on_game_load()
+    warfare_log.info("on_game_load: priming ignore list and scheduling resetter")
+    ignore = sim_offline_combat.get_ignore_list()
+    CreateTimeEvent(0, "reset_warfare_callbacks", 60, resetter)
+end
+
 function on_game_start()
     warfare_log.banner("Warfare ALife Overhaul %s", VERSION)
     warfare_log.info("on_game_start: registering warfare callbacks")
@@ -1529,12 +1535,6 @@ function on_game_start()
     RegisterScriptCallback("squad_on_npc_death", sim_squad_warfare.squad_on_npc_death)
     RegisterScriptCallback("server_entity_on_unregister", squad_on_unregister)
     RegisterScriptCallback("actor_on_first_update", actor_on_first_update)
-
-    local function on_game_load()
-        warfare_log.info("on_game_load: priming ignore list and scheduling resetter")
-        ignore = sim_offline_combat.get_ignore_list()
-        CreateTimeEvent(0, "reset_warfare_callbacks", 60, resetter)
-    end
     RegisterScriptCallback("on_game_load", on_game_load)
 end
 
@@ -1769,10 +1769,13 @@ function resetter()
         UnregisterScriptCallback("smart_terrain_on_update", smart_terrain_warfare.smart_terrain_on_update)
         UnregisterScriptCallback("squad_on_update", sim_squad_warfare.squad_on_update)
         UnregisterScriptCallback("actor_on_update", actor_on_update)
+        UnregisterScriptCallback("actor_on_update", reset_frame_clock)
+        UnregisterScriptCallback("actor_on_net_destroy", reset_frame_clock)
         UnregisterScriptCallback("save_state", save_state)
         UnregisterScriptCallback("squad_on_npc_death", sim_squad_warfare.squad_on_npc_death)
         UnregisterScriptCallback("server_entity_on_unregister", squad_on_unregister)
         UnregisterScriptCallback("actor_on_first_update", actor_on_first_update)
+        UnregisterScriptCallback("on_game_load", on_game_load)
     end
     return true
 end

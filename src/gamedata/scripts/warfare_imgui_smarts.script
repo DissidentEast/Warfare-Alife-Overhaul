@@ -126,11 +126,15 @@ end
 
 -- Function to get patrol timer raw value for sorting
 function get_patrol_timer_number(smart)
-    if (warfare_options.options.factions[smart.owning_faction].patrol_squads or 0) <= 0 then
+    local ff = smart.owning_faction and warfare_options.options.factions[smart.owning_faction]
+    if not ff or (ff.patrol_squads or 0) <= 0 then
         return 0 -- Disabled state gets special sort value
     end
 
     local patrol_timer = smart_terrain_warfare.patrol_timers[smart.id]
+    if not patrol_timer then
+        return 0
+    end
     local next_patrol = smart_terrain_warfare.get_current_patrol_respawn_interval(smart.owning_faction)
 
     return warfare_utils.get_real_seconds_until_spawn(patrol_timer, next_patrol)

@@ -46,7 +46,6 @@ function pda_warfare_tab:__init() super()
     self.faction_power_lvl = {}
     self.faction_smarts = {}
     self.faction_smarts_lvl = {}
-    self.faction_smarts_lvls = {}
     self.tot_smarts = 0
     self.tot_smarts_lvl = 0
     
@@ -169,16 +168,11 @@ function pda_warfare_tab:Reset()
     -- Gather smart count in active levels + faction smarts count
     empty_table(self.faction_smarts)
     empty_table(self.faction_smarts_lvl)
-    empty_table(self.faction_smarts_lvls)
     self.tot_smarts = 0
     self.tot_smarts_lvl = 0
     for name,smart in pairs(SIMBOARD.smarts_by_names) do
         local lvl = gg:vertex(smart.m_game_vertex_id):level_id()
         if active_levels[lvl] and ((smart.props.base > 0) or (smart.props.resource > 0)) then                            -- only count useful smart terrains
-            if (not self.faction_smarts_lvls[lvl]) then
-                self.faction_smarts_lvls[lvl] = {}
-            end
-        
             -- Smart count
             self.tot_smarts = self.tot_smarts + 1
             if (lvl == curr_lvl) then
@@ -192,9 +186,6 @@ function pda_warfare_tab:Reset()
                 if (lvl == curr_lvl) then
                     self.faction_smarts_lvl[o_f] = (self.faction_smarts_lvl[o_f] or 0) + 1
                 end
-                
-                local cnt_lvl = self.faction_smarts_lvls[lvl][o_f] or 0
-                self.faction_smarts_lvls[lvl][o_f] = cnt_lvl + 1
             end
         end
     end
@@ -324,36 +315,18 @@ end
 
 function pda_warfare_tab:Update()
     CUIScriptWnd.Update(self)
-    
-    -- Gather faction squads in each active level
-    local faction_territory = {}
-    for lvl,v in pairs(self.faction_smarts_lvls) do
-        for f,num in pairs(v) do
-            if (not faction_territory[f]) then
-                faction_territory[f] = {lvl,num}
-            elseif faction_territory[f] and (faction_territory[f][2] < num) then
-                faction_territory[f] = {lvl,num}
-            end
-        end
-    end
-    
+
     -- Show faction progress
     for f,v in pairs(self.progress_dominance) do
         if (v and v:IsCursorOverWindow()) then
+            -- the base game's template: "%s are holding %s out of %s outposts in %s"
             local str = game.translate_string("ui_st_pda_warfare_dominance")
             local str_fac = game.translate_string("st_dyn_news_comm_" .. f .. "_7")
-            local str_fac_smarts = self.curr_map and (self.faction_smarts_lvl[f] or 0) or (self.faction_smarts[f] or 0)
-            local str_all_smarts = self.curr_map and self.tot_smarts_lvl or self.tot_smarts
             local str_extra = self.curr_map and game.translate_string(level.name()) or game.translate_string("ui_st_pda_warfare_zone")
-            local str_faction_base_count = faction_info(f).owned_base_count or 0
-            local str_total_base_count = warfare.base_count
-            local str_territory = faction_territory[f] and faction_territory[f][1] and alife():level_name(faction_territory[f][1])
-            local str_faction_resources_count = faction_info(f).owned_resource_count or 0
-            local str_faction_terrain_count = str_faction_resources_count + str_faction_base_count
+            local str_faction_terrain_count = (faction_info(f).owned_resource_count or 0) + (faction_info(f).owned_base_count or 0)
             local str_total_terrain_count = warfare.resource_count + warfare.base_count
-            local str_total_resources_count = warfare.resource_count
 
-            str = strformat(str, str_fac, str_faction_terrain_count, str_total_terrain_count, str_faction_base_count, str_total_base_count, str_extra, game.translate_string(str_territory or ""))
+            str = strformat(str, str_fac, str_faction_terrain_count, str_total_terrain_count, str_extra)
             
             self.hint_wnd:Update(str)
             return

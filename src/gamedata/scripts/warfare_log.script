@@ -208,6 +208,11 @@ function enabled()
     return _current_level >= LEVEL.DEBUG
 end
 
+-- Gate for trace calls on per-frame paths: their arguments are evaluated even when trace is off.
+function tracing()
+    return _current_level >= LEVEL.TRACE
+end
+
 function flush()
     _flush()
 end

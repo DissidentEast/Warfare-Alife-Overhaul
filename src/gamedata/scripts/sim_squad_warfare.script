@@ -67,7 +67,9 @@ function translate_smart_name(name)
 end
 
 function squad_on_update(squad)
-    warfare_log.trace("sqw.squad_on_update: squad=%s", squad and squad:name() or "?")
+    if warfare_log.tracing() then
+        warfare_log.trace("sqw.squad_on_update: squad=%s", squad and squad:name() or "?")
+    end
 
     if not (IsWarfare()) then
         return

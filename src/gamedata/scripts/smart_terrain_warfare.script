@@ -797,8 +797,10 @@ function smart_terrain_on_update(smart)
     if not (IsWarfare()) then
         return
     end
-    warfare_log.trace("smart_terrain_on_update: smart=%s faction=%s",
-        smart:name(), tostring(smart.owning_faction))
+    if warfare_log.tracing() then
+        warfare_log.trace("smart_terrain_on_update: smart=%s faction=%s",
+            smart:name(), tostring(smart.owning_faction))
+    end
 
     -- avoid vanilla respawns
     local curr_time = warfare.get_time()

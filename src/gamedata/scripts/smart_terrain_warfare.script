@@ -2648,9 +2648,12 @@ function create_invasion_plan(smart, target)
         end
 
         total_allied_power = total_allied_power * sim_offline_combat.calculate_distance_combat_multiplier(global_position.from(target), smart.owning_faction)-- compare average enemy squad power to the attacking faction's average squad power
-        local avg_allied_squad_power = total_allied_power / num_allied_squads
-        local avg_enemy_squad_power = total_enemy_power / num_enemy_squads
-        local power_ratio = avg_enemy_squad_power / avg_allied_squad_power        -- how many times more powerful are enemy squads than allied squads
+        local avg_allied_squad_power = total_allied_power / math.max(num_allied_squads, 1)
+        local avg_enemy_squad_power = total_enemy_power / math.max(num_enemy_squads, 1)
+        local power_ratio = 1        -- how many times more powerful are enemy squads than allied squads; even odds when either side has no power
+        if (avg_allied_squad_power > 0) and (avg_enemy_squad_power > 0) then
+            power_ratio = avg_enemy_squad_power / avg_allied_squad_power
+        end
 
         local sq_num,sq_pow,sq_stat = squad_count_detailed(smart, smart.owning_faction)
         local x = math.random()

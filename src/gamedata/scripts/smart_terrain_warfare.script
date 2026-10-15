@@ -4642,7 +4642,7 @@ function smart_terrain.se_smart_terrain:show()
            and (faction == warfare.actor_faction or not is_factions_enemies(warfare.actor_faction, faction)) then
             want_overlay = "target_" .. faction
         end
-        reconcile_self_overlay(self, want_overlay)
+        reconcile_self_overlay(self, want_overlay, want_overlay and get_warfare_info(self) or nil)
     end
 
 end
@@ -4829,6 +4829,7 @@ function set_target_circle(id, old_key, new_key, info)
     if old_key == new_key then
         if new_key then
             level.map_change_spot_hint(id, target_icon_spot(new_key), info)
+            level.map_change_spot_hint(id, target_outline_spot(new_key), info)
         end
         return
     end
@@ -4854,7 +4855,9 @@ function set_target_circle(id, old_key, new_key, info)
             level.map_change_spot_hint(id, new_icon, info)
         end
         if level.map_has_object_spot(id, new_outline) == 0 then
-            level.map_add_object_spot(id, new_outline, "")
+            level.map_add_object_spot(id, new_outline, info or "")
+        else
+            level.map_change_spot_hint(id, new_outline, info)
         end
     end
 end
@@ -4863,13 +4866,19 @@ end
 -- want_key is "target_<faction>" while the base shows its icon and is under attack, else nil.
 -- Shares the circle_target_<faction> spot type with attacker-placed markers, so ownership is
 -- handed off (not double-managed) via place_target_circle clearing warfare_overlay.
-function reconcile_self_overlay(smart, want_key)
-    if smart.warfare_overlay == want_key then return end
+-- info is the hover hint; the outline ring is hoverable too, so it gets the same text.
+function reconcile_self_overlay(smart, want_key, info)
+    if smart.warfare_overlay == want_key then
+        if want_key then
+            level.map_change_spot_hint(smart.id, target_outline_spot(want_key), info)
+        end
+        return
+    end
     if smart.warfare_overlay then
         level.map_remove_object_spot(smart.id, target_outline_spot(smart.warfare_overlay))
     end
     if want_key and level.map_has_object_spot(smart.id, target_outline_spot(want_key)) == 0 then
-        level.map_add_object_spot(smart.id, target_outline_spot(want_key), "")
+        level.map_add_object_spot(smart.id, target_outline_spot(want_key), info or "")
     end
     smart.warfare_overlay = want_key
 end

@@ -502,6 +502,7 @@ function save_state(m_data)
     m_data.warfare.manual_control = pda_actor.manual_control
     m_data.warfare.manual_point = smart_terrain_warfare.manual_point
     m_data.warfare.invasions = smart_terrain_warfare.invasions
+    m_data.warfare.supporting_invasion = smart_terrain_warfare.supporting_invasion
     m_data.warfare.player_heli = warfare_faction_control.player_heli
     m_data.warfare.defense_timers = smart_terrain_warfare.defense_timers
     m_data.warfare.defense_delay = smart_terrain_warfare.defense_delay
@@ -601,6 +602,7 @@ function load_state(m_data)
 
 
     smart_terrain_warfare.invasions = m_data.warfare and m_data.warfare.invasions or {}
+    smart_terrain_warfare.supporting_invasion = m_data.warfare and m_data.warfare.supporting_invasion or {}
     warfare_faction_control.player_heli = m_data.warfare and m_data.warfare.player_heli
 
     -- Detect legacy save (pre-1.4.5): defense_delay was introduced after 1.4.2.

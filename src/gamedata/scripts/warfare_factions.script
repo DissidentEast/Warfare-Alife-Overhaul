@@ -361,7 +361,7 @@ function update_faction(faction)
 
                                     warfare_log.info("update_faction: %s legacy resurgence spawning %s squads at %s targeting %s", tostring(faction), tostring(target_pop), nearest_smart and nearest_smart:name() or "?", target:name())
 
-                                    for j = 0, target_pop do
+                                    for j = 1, target_pop do
                                         local current_level = nearest_smart.level_id
                                     local section = faction_expansions.get_spawn_section(faction, fi.resource_count, current_level)
                                         local squad = warfare.spawn_squad(section, nearest_smart:name())

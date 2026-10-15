@@ -662,7 +662,7 @@ function get_squad_info(squad, full_detail, show_target)
 
             if (squad.patrol_table) then
                 if (squad.patrol_table.arrive_time and squad.patrol_table.stay_time) then
-                    local diff = warfare.get_time():diffSec(squad.patrol_table.arrive_time)
+                    local diff = warfare.get_time_ref():diffSec(squad.patrol_table.arrive_time)
                     local remaining = squad.patrol_table.stay_time - diff
 
                     -- xQd, show the timer in hours and minutes

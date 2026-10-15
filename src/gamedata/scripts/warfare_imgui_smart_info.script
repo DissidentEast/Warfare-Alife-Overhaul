@@ -161,7 +161,7 @@ function get_unique_check_timer(smart)
         return "Invalid timer"
     end
     
-    local diff = warfare.get_time():diffSec(smart.last_unique_check)
+    local diff = warfare.get_time_ref():diffSec(smart.last_unique_check)
     local remaining = smart.next_unique_check - diff
     
     return format_time_remaining(remaining)
@@ -406,7 +406,7 @@ function render_faction_smart_info(smart, faction)
         ImGui.Text("Process Squads Timer:")
         
         if smart.process_squads_time and smart.next_process_squads_time then
-            local diff = warfare.get_time():diffSec(smart.process_squads_time)
+            local diff = warfare.get_time_ref():diffSec(smart.process_squads_time)
             local remaining = smart.next_process_squads_time - diff
             
             local time_status = format_time_remaining(remaining)
@@ -451,7 +451,7 @@ function render_mutant_smart_info(smart)
     local next_update = smart_terrain_warfare.spawn_mutant_next_update and smart_terrain_warfare.spawn_mutant_next_update[smart.id]
     
     if spawn_timer and next_update then
-        local diff = warfare.get_time():diffSec(spawn_timer)
+        local diff = warfare.get_time_ref():diffSec(spawn_timer)
         local remaining = next_update - diff
         
         local time_status = format_time_remaining(remaining)
@@ -586,7 +586,7 @@ function render_mutant_smart_info(smart)
     local process_next_update = smart_terrain_warfare.process_mutant_next_update and smart_terrain_warfare.process_mutant_next_update[smart.id]
     
     if process_timer and process_next_update then
-        local diff = warfare.get_time():diffSec(process_timer)
+        local diff = warfare.get_time_ref():diffSec(process_timer)
         local remaining = process_next_update - diff
         
         local time_status = format_time_remaining(remaining)
@@ -630,7 +630,7 @@ function render_mutant_smart_info(smart)
                         waiting_mutants = waiting_mutants + 1
                         local wait_remaining = 0
                         if squad.arrive_time then
-                            local time_here = warfare.get_time():diffSec(squad.arrive_time)
+                            local time_here = warfare.get_time_ref():diffSec(squad.arrive_time)
                             wait_remaining = math.max(0, squad.wait_time - time_here)
                         end
                         table.insert(mutant_behavior, {
@@ -833,7 +833,7 @@ function render()
                                smart_terrain_warfare.invasion_defense_next_update[smart.id]
         
         if defense_timer_val and next_update_val then
-            local diff = warfare.get_time():diffSec(defense_timer_val)
+            local diff = warfare.get_time_ref():diffSec(defense_timer_val)
             local remaining = next_update_val - diff
             
             ImGui.Text("  Defense Check: " .. format_time_remaining(remaining))

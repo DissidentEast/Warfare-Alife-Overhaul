@@ -42,7 +42,7 @@ function get_auto_capture_status()
 
         -- Calculate time elapsed
         if smart_terrain_warfare.manual_point[2] then
-            status.time_elapsed = round_idp(warfare.get_time():diffSec(smart_terrain_warfare.manual_point[2]))
+            status.time_elapsed = round_idp(warfare.get_time_ref():diffSec(smart_terrain_warfare.manual_point[2]))
         else
             status.time_elapsed = 0
         end

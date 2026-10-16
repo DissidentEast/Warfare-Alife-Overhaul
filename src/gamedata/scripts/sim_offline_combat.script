@@ -1190,15 +1190,8 @@ function disengage_combat(id_1, squad_1, id_t, sq_t)
     last_combat_time[id_t] = nil
 end
 
-function remove_squad_info(squad_2, id_2, id_1, lid)
-    warfare_log.debug("remove_squad_info: squad=%s opponent=%s lid=%s", id_2 or (squad_2 and squad_2.id), id_1, lid)
-    if _G.WARFARE then
-        sim_squad_warfare.remove_squad(squad_2)
-    end
-
-    id_2 = id_2 or squad_2.id
-    lid = lid or game_graph():vertex(squad_2.m_game_vertex_id):level_id()
-
+-- Drops id_2 from every combat table; id_1, when given, is the foe whose lock on id_2 is released.
+local function clear_squad_state(id_2, id_1, lid)
     ocs_power[id_2] = nil
 
     if id_1 then
@@ -1215,7 +1208,27 @@ function remove_squad_info(squad_2, id_2, id_1, lid)
         squads_by_level[lid][id_2] = nil
     end
     last_x[id_2], last_z[id_2] = nil, nil
+end
 
+function remove_squad_info(squad_2, id_2, id_1, lid)
+    warfare_log.debug("remove_squad_info: squad=%s opponent=%s lid=%s", id_2 or (squad_2 and squad_2.id), id_1, lid)
+    if _G.WARFARE then
+        sim_squad_warfare.remove_squad(squad_2)
+    end
+
+    id_2 = id_2 or squad_2.id
+    lid = lid or game_graph():vertex(squad_2.m_game_vertex_id):level_id()
+    clear_squad_state(id_2, id_1, lid)
+end
+
+-- For a squad leaving the simulation by any path: clears its combat state and its foe's lock on it.
+function forget_squad(squad)
+    local id = squad.id
+    local foe = opponents[id]
+    if foe and opponents[foe] ~= id then
+        foe = nil
+    end
+    clear_squad_state(id, foe, game_graph():vertex(squad.m_game_vertex_id):level_id())
 end
 
 

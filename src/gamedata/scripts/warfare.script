@@ -837,6 +837,7 @@ function actor_on_update()
         -- level admission is final only now; drop owned/supported smart lists built before it
         sim_offline_combat.invalidate_distance_cache()
         initialize()
+        warfare_squad_command.prune_missing()
         warfare_levels.update()
         smart_terrain_warfare.build_smart_collections()
         warfare_factions.update()
@@ -1420,6 +1421,10 @@ function squad_on_unregister(squad, type_name)
     if (squad) then
         local faction = squad:get_squad_community()
         warfare_log.debug("squad_on_unregister: squad=%s id=%s faction=%s", squad:name(), squad.id, faction)
+
+        -- Every release path ends here; the engine reuses freed ids, so nothing may keep this one.
+        sim_offline_combat.forget_squad(squad)
+        warfare_squad_command.on_squad_removed(squad)
 
         if (registered_squads[faction]) then
             remove_registered_squad(faction, squad.id)

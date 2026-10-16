@@ -617,6 +617,31 @@ function on_squad_removed(squad)
     _remove_from_detachment(id)
 end
 
+-- Drops command entries whose id no longer resolves to a squad. Saves made before squad release
+-- cleared command state can carry them; call once alife objects resolve.
+function prune_missing()
+    local n = 0
+    local function gone(id)
+        local obj = alife_object(id)
+        return not (obj and obj:clsid() == clsid.online_offline_group_s)
+    end
+    for id in pairs(controlled) do
+        if gone(id) then
+            controlled[id] = nil
+            n = n + 1
+        end
+    end
+    for id in pairs(squad_detachment) do
+        if gone(id) then
+            _remove_from_detachment(id)
+            n = n + 1
+        end
+    end
+    if n > 0 then
+        warfare_log.info("prune_missing: dropped %s command entries for squads that no longer exist", n)
+    end
+end
+
 -- ---------------------------------------------------------------------------
 -- Persistence (m_data.warfare blob; driven from warfare.save_state / load_state)
 -- ---------------------------------------------------------------------------
@@ -638,8 +663,7 @@ function load_state(blob)
     -- NOTE: do NOT purge by alife_object() here -- squad alife objects are not yet resolvable
     -- at warfare load time (the vanilla registered_squads restore relies on the same fact and
     -- restores entries even when alife_object returns nil). Purging here wiped the whole table.
-    -- Stale entries for removed squads are harmless: count_controlled() filters
-    -- by alife_object at runtime, and on_squad_removed() cleans entries when a squad is removed.
+    -- prune_missing() drops entries for removed squads once objects resolve.
 
     -- Migrate detachments saved before slots existed (or with a clashing/out-of-range slot):
     -- assign each a stable free slot so name/colour/sort work. Drop any beyond MAX_DETACHMENTS.

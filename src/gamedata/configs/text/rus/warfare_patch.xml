@@ -446,6 +446,15 @@
 	<string id="ui_mm_alife_warfare_faction_lvl_y04_pole_priority_desc">
 		<text>Постоянная надбавка к приоритету всех целей на Поляне. Положительные значения притягивают фракцию к этому уровню, отрицательные — отталкивают.</text>
 	</string>
+	<string id="ui_mm_alife_warfare_sec_faction_addon_levels">
+		<text>Приоритеты локаций из модов</text>
+	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_addon_priority">
+		<text>%s, Приоритет</text>
+	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_addon_priority_desc">
+		<text>Постоянная надбавка к приоритету всех целей на локации «%s», добавленной другим модом. Положительные значения притягивают фракцию к этой локации, отрицательные — отталкивают.</text>
+	</string>
 	<!-- Warfare preset save/delete UI -->
 	<string id="ui_mm_warfare_preset_save">
 		<text>Сохранить</text>

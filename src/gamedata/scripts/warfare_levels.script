@@ -407,6 +407,19 @@ function open_graph_gated_smarts()
 	end
 end
 
+-- Names of the non-vanilla overground levels warfare plays on, sorted: the levels that get a
+-- priority row in the options (modxml_warfare.sync_addon_levels).
+function addon_level_names()
+	local names = {}
+	for lvl in pairs(level_information) do
+		if not (is_vanilla_level(lvl)) and (level_zone(lvl) ~= "underground") then
+			names[#names + 1] = level_name_for(lvl)
+		end
+	end
+	table.sort(names)
+	return names
+end
+
 local function in_active_levels(level_id)
 	for _, lvl in pairs(level_targets.active_levels) do
 		if (lvl == level_id) then

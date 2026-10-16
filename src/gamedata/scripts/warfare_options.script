@@ -385,11 +385,9 @@ function update_settings()
         options.factions[faction].resource_count_modifier = ui_options.get("alife/warfare/" .. faction .. "/resource_count_modifier")
         options.factions[faction].base_count_modifier = ui_options.get("alife/warfare/" .. faction .. "/base_count_modifier")
 
-        for _, lvl in pairs(level_targets.level_names) do
-            options.factions[faction]["lvl_" .. lvl .. "_priority"] = ui_options.get("alife/warfare/" .. faction .. "/lvl_" .. lvl .. "_priority")
+        for _, id in ipairs(modxml_warfare.level_priority_ids()) do
+            options.factions[faction][id] = ui_options.get("alife/warfare/" .. faction .. "/" .. id)
         end
-        -- not in level_targets.level_names
-        options.factions[faction].lvl_y04_pole_priority = ui_options.get("alife/warfare/" .. faction .. "/lvl_y04_pole_priority")
 
         -- Behavior traits, read as a block so warfare_behavior owns their names and defaults.
         local behavior = {}

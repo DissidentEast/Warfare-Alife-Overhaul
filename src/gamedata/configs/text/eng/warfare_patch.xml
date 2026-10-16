@@ -451,6 +451,15 @@
 	<string id="ui_mm_alife_warfare_faction_lvl_y04_pole_priority_desc">
 		<text>Flat priority added to every target in the Meadow. Positive values draw this faction toward the level, negative values push it away.</text>
 	</string>
+	<string id="ui_mm_alife_warfare_sec_faction_addon_levels">
+		<text>Add-on Level Priorities</text>
+	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_addon_priority">
+		<text>Level (%s) priority</text>
+	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_addon_priority_desc">
+		<text>Flat priority added to every target in %s, a level added by another mod. Positive values draw this faction toward the level, negative values push it away.</text>
+	</string>
 	<!-- Warfare preset save/delete UI -->
 	<string id="ui_mm_warfare_preset_save">
 		<text>Save preset</text>

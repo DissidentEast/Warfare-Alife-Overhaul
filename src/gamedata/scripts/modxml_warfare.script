@@ -8,6 +8,89 @@ local function add_choice(row, value)
     table.insert(row.content, { value })
 end
 
+-- Add-on level priority rows. The tree is built before any game graph exists (main menu included),
+-- so it carries the add-on levels of the last loaded game; sync_addon_levels corrects them once the
+-- graph is known. They sit in their own section at the end of every faction page, so changing them
+-- never moves another row's index.
+local ADDON_LEVELS_KEY = "alife/warfare/general/_addon_levels"
+local static_level_ids = {}
+local static_level_set = {}
+local addon_level_ids = {}
+local faction_pages = {}
+
+local function addon_level_rows(names)
+    local rows = {}
+    for _, name in ipairs(names) do
+        local id = "lvl_" .. name .. "_priority"
+        if not static_level_set[id] then
+            local hint = "alife_warfare_faction_" .. id
+            local level = game.translate_string(name)
+            modxml_warfare_ui.set_runtime_caption(hint,
+                string.format(game.translate_string("ui_mm_alife_warfare_faction_lvl_addon_priority"), level),
+                string.format(game.translate_string("ui_mm_alife_warfare_faction_lvl_addon_priority_desc"), level))
+            rows[#rows + 1] = { id = id, type = "track", val = 2, def = 0, min = -100, max = 100, step = 1, hint = hint }
+        end
+    end
+    return rows
+end
+
+-- Replaces the add-on section at the end of every faction page. With register, the option paths
+-- are coded here too, for a tree init_opt_coder has already coded.
+local function set_addon_level_rows(names, register)
+    local rows = addon_level_rows(names)
+    local tail = (#rows > 0) and modxml_warfare_ui.build_sections({ { id = "faction_addon_levels", rows = rows } }) or {}
+    for _, page in ipairs(faction_pages) do
+        local gr = page.gr
+        for i = #gr, page.base + 1, -1 do
+            if register and ui_options.allowed_type[gr[i].type] then
+                local path = ui_options.cc(page.path, gr[i].id)
+                ui_options.opt_index[path] = nil
+                ui_options.opt_val[path] = nil
+            end
+            gr[i] = nil
+        end
+        for k, row in ipairs(tail) do
+            local i = page.base + k
+            gr[i] = row
+            if register and ui_options.allowed_type[row.type] then
+                local path = ui_options.cc(page.path, row.id)
+                ui_options.opt_index[path] = ui_options.cc(page.num, i)
+                ui_options.opt_val[path] = row.val
+            end
+        end
+    end
+    addon_level_ids = {}
+    for _, row in ipairs(rows) do
+        addon_level_ids[#addon_level_ids + 1] = row.id
+    end
+end
+
+-- Every lvl_<name>_priority row id on the faction pages, static rows first.
+function level_priority_ids()
+    local ids = {}
+    for _, id in ipairs(static_level_ids) do
+        ids[#ids + 1] = id
+    end
+    for _, id in ipairs(addon_level_ids) do
+        ids[#ids + 1] = id
+    end
+    return ids
+end
+
+-- names: the overground add-on levels of the loaded game graph, sorted. When they differ from the
+-- stored set the rows are rebuilt and the warfare settings re-read.
+function sync_addon_levels(names)
+    local joined = table.concat(names, ",")
+    if joined == (axr_main.config:r_value("options", ADDON_LEVELS_KEY, 0, "") or "") then
+        return
+    end
+    axr_main.config:w_value("options", ADDON_LEVELS_KEY, joined)
+    axr_main.config:save()
+    set_addon_level_rows(names, true)
+    warfare_log.info("modxml_warfare.sync_addon_levels: add-on level priority rows now [%s]", joined)
+    warfare_options.update_settings()
+end
+
 local old_ui_options_init_opt_coder = ui_options.init_opt_coder
 function ui_options.init_opt_coder()
     warfare_log.debug("modxml_warfare.init_opt_coder: injecting warfare options into MCM tree")
@@ -158,6 +241,14 @@ function ui_options.init_opt_coder()
     for _, row in ipairs(options) do
         if row.val then
             row.hint = "alife_warfare_faction_" .. row.id
+        end
+    end
+
+    static_level_ids, static_level_set = {}, {}
+    for _, row in ipairs(options) do
+        if row.val and string.find(row.id, "^lvl_.+_priority$") then
+            static_level_ids[#static_level_ids + 1] = row.id
+            static_level_set[row.id] = true
         end
     end
 
@@ -328,16 +419,26 @@ function ui_options.init_opt_coder()
     end
 
     local FACTIONS = { "stalker", "bandit", "csky", "army", "freedom", "dolg", "ecolog", "killer", "monolith", "renegade", "greh", "isg", "zombied" }
+    faction_pages = {}
     for i, faction in ipairs(FACTIONS) do
-        warfare_options.gr[alife_warfare_stalker_options_index + i - 1] = {
+        local slot = alife_warfare_stalker_options_index + i - 1
+        local gr = faction_gr(faction)
+        warfare_options.gr[slot] = {
             id = faction,
             sh = true,
             warfare_presets = true,
             id_gr = "warfare_faction",
             apply_to_all = true,
-            gr = faction_gr(faction),
+            gr = gr,
+        }
+        faction_pages[i] = {
+            gr = gr,
+            base = #gr,
+            path = ui_options.cc(ui_options.cc("alife", "warfare"), faction),
+            num = ui_options.cc(ui_options.cc(alife_options_index, alife_warfare_options_index), slot),
         }
     end
+    set_addon_level_rows(parse_names(axr_main.config:r_value("options", ADDON_LEVELS_KEY, 0, "") or ""), false)
 
     -- Player Command. Three modes (see warfare_squad_command): "ranked" scales the controllable
     -- count with the actor's rank on the fixed Anomaly rank ladder and lets the rank gap decide

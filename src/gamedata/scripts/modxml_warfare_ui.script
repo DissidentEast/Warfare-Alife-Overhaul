@@ -48,10 +48,21 @@ local function cap_id(id)
     return (string.gsub(id, "/", "_"))
 end
 
+-- Captions built at runtime (add-on level rows): hint -> { label, desc }, already translated.
+local runtime_captions = {}
+
+function set_runtime_caption(hint, label, desc)
+    runtime_captions[hint] = { label = label, desc = desc }
+end
+
 local function row_label(path, row)
     local zcp = modxml_warfare_zcp.caption(ui_options.cc(path, row.id))
     if zcp then
         return game.translate_string(zcp.label)
+    end
+    local runtime = row.hint and runtime_captions[row.hint]
+    if runtime then
+        return runtime.label
     end
     return game.translate_string("ui_mm_" .. (row.hint or cap_id(ui_options.cc(path, row.id))))
 end
@@ -70,6 +81,9 @@ function ui_options.UIOptions.Register_Cap(self, xml, handler, id, hint)
         if desc ~= zcp.desc then
             cap_desc[cap_id(id)] = desc
         end
+    elseif hint and runtime_captions[hint] then
+        self._Cap[cap_id(id)]:TextControl():SetText(runtime_captions[hint].label)
+        cap_desc[cap_id(id)] = runtime_captions[hint].desc
     elseif hint then
         local str = "ui_mm_" .. hint .. "_desc"
         local desc = game.translate_string(str)

@@ -482,6 +482,7 @@ function build_level_information()
 
     smart_terrain_warfare.resolve_monster_level_capacity()
     smart_terrain_warfare.derive_lab_entrances()
+    modxml_warfare.sync_addon_levels(warfare_levels.addon_level_names())
 end
 
 -- save warfare state

@@ -3345,7 +3345,9 @@ function find_patrol_target(smart,patrol_table,squad)
 end
 
 function process_patrols(smart)
-    -- TODO: interpolate between min and max respawn times (make two different sets of variables for defense and offense?)
+    -- Sweep cadence (3-9 game-minutes) is intentionally fixed: it only sets
+    -- how often patrols are reconsidered, while durations come from the
+    -- min/max patrol time and rest options.
     if not (smart.process_patrols_timer) then
         smart.process_patrols_timer = warfare.get_time()
         smart.next_process_patrols_update = math.random(180, 540)
@@ -3927,9 +3929,11 @@ function process_mutants(smart)
 
                         local targets = {}
 
-                        -- Just for now, 1 in 20 chance of moving off level.
-                        -- TODO: Make this an option that can be tweaked
-                        if (math.random(1, 20) > 19) then
+                        -- Cross-level hop chance, percent. Tunable via preset key
+                        -- alife/warfare/general/mutant_offlevel_chance (default 5).
+                        local hop_chance = ui_options.get("alife/warfare/general/mutant_offlevel_chance") or 5
+
+                        if (math.random(100) <= hop_chance) then
                             local current_level = smart.level_id
                             if not ( ((current_level > 19) and (current_level < 27)) or (current_level == 29) or (current_level == 31) ) then    -- forbid mutants inside labs from changing levels
                                 local linked = level_targets.level_links[smart.level_id]

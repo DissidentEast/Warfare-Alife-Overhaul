@@ -206,6 +206,26 @@ end
 
 -- Modified generic_update for warfare. squad.__lock will cause generic_update not to run.
 -- Not using scripted_target / specific_update, and need to avoid the precondition check.
+-- Patrol stay time: patrol squads rest between min/max_patrol_rest_time
+-- (faction options, game seconds); everyone else keeps the legacy 60-360.
+local function get_stay_time(squad, community)
+    local is_patrol = smart_terrain_warfare.random_patrols[squad.id] or squad.patrol_table
+
+    if (is_patrol) then
+        local fopts = warfare_options.options.factions[community]
+        local rest_min = fopts and fopts.min_patrol_rest_time or 60
+        local rest_max = fopts and fopts.max_patrol_rest_time or 360
+
+        if (rest_max < rest_min) then
+            rest_max = rest_min
+        end
+
+        return math.random(rest_min, rest_max)
+    end
+
+    return math.random(60, 360)
+end
+
 function squad_warfare_update(squad)
     warfare_log.trace("squad_warfare_update: squad=%s action=%s target=%s", squad and squad.id or "?", squad.current_action, squad.current_target_id)
 
@@ -254,7 +274,7 @@ function squad_warfare_update(squad)
                                 se_target:on_after_reach(squad)
                                 squad.current_action = 1
                                 squad.arrive_time = warfare.get_time()
-                                squad.wait_time = math.random(60, 360)
+                                squad.wait_time = get_stay_time(squad, community)
                             end
                         end
                     else
@@ -285,7 +305,7 @@ function squad_warfare_update(squad)
                         se_target:on_after_reach(squad)
                         squad.current_action = 1
                         squad.arrive_time = warfare.get_time()
-                        squad.wait_time = math.random(60, 360)
+                        squad.wait_time = get_stay_time(squad, squad:get_squad_community())
                     end
                 end
             end

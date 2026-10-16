@@ -84,6 +84,12 @@
 	<string id="ui_mm_alife_warfare_general_monster_rare_chance_lab_desc">
 		<text>The percent chance that a mutant spawn in a laboratory will be a rare mutant (controller, chimera, etc). Default: 50</text>
 	</string>
+	<string id="ui_mm_alife_warfare_general_mutant_offlevel_chance">
+		<text>Mutant off-level move chance</text>
+	</string>
+	<string id="ui_mm_alife_warfare_general_mutant_offlevel_chance_desc">
+		<text>The percent chance that an idle mutant squad leaves its level when retargeting. Default: 5</text>
+	</string>
 	<string id="ui_mm_alife_warfare_general_monster_night_power_multiplier">
 		<text>Mutant Night Power Multiplier</text>
 	</string>

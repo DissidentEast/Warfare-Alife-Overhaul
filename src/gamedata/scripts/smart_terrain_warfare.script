@@ -3251,6 +3251,9 @@ function spawn_patrols(smart)
             if (tobj) then
                 local section = faction_expansions.get_spawn_section(smart.owning_faction, smart.resource_count)
                 local squad = warfare.spawn_squad(section, smart:name())
+                if not squad then
+                    return
+                end
 
                 if (is_squad) then
                     new_table = {

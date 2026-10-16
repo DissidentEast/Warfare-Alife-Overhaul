@@ -279,9 +279,11 @@ function update_faction(faction)
                         local section = faction_expansions.get_spawn_section(faction, fi.resource_count, current_level)
                         local squad = warfare.spawn_squad(section, start:name())
 
-                        smart_terrain_warfare.set_random_patrol(squad.id, faction)
-                        sim_squad_warfare.set_target(squad, target_id)
-                        warfare_log.info("update_faction: %s spawned random patrol section=%s at %s targeting id=%s", tostring(faction), tostring(section), start:name(), tostring(target_id))
+                        if squad then
+                            smart_terrain_warfare.set_random_patrol(squad.id, faction)
+                            sim_squad_warfare.set_target(squad, target_id)
+                            warfare_log.info("update_faction: %s spawned random patrol section=%s at %s targeting id=%s", tostring(faction), tostring(section), start:name(), tostring(target_id))
+                        end
                     end
                 else
                     warfare_log.trace("update_faction: %s random patrol skipped (start=%s target=%s count=%s/%s)", tostring(faction), tostring(start and start:name()), tostring(target_id), tostring(count), tostring(max_random_patrols))

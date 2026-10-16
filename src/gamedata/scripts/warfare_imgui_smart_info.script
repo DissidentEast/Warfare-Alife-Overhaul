@@ -685,8 +685,7 @@ function render_mutant_smart_info(smart)
         ImGui.Text("  Target preference: Unoccupied smarts first")
         
         -- Check if lab restriction applies
-        local current_level = smart.level_id
-        local is_lab = ((current_level > 19) and (current_level < 27)) or (current_level == 29) or (current_level == 31)
+        local is_lab = warfare_levels.level_zone(smart.level_id) == "underground"
         if is_lab then
             ImGui.Text("  Lab Restriction: Cannot move to other levels")
         else

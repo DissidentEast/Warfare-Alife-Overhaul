@@ -121,6 +121,99 @@ local function log_link_differences(level_id)
 	end
 end
 
+-- Level zones -----------------------------------------------------------------
+--
+-- The region a level belongs to: "south", "mid", "north" or "underground". The
+-- scorcher divide, faction targeting and mutant spawns all read it. Vanilla levels
+-- (ids the engine never renumbers) are listed, and so is any id in level_targets.labs.
+-- Any other level is underground unless game_maps_single gives it atmosfear weather
+-- (vanilla level_weathers' rule); otherwise it takes the zone most of its nearest
+-- listed overground levels have, south on a tie or when none is reachable.
+local vanilla_zones = {
+	[1] = "south", [2] = "south", [3] = "south", [4] = "south", [5] = "south", [6] = "south",
+	[7] = "mid", [8] = "mid", [9] = "mid", [10] = "mid", [11] = "mid",
+	[12] = "north", [13] = "north", [14] = "north", [15] = "north", [16] = "north",
+	[17] = "north", [18] = "north", [19] = "north",
+	[20] = "underground", [21] = "underground", [22] = "underground", [23] = "underground",
+	[24] = "underground", [25] = "underground", [26] = "underground",
+	[27] = "north", [28] = "north", [29] = "underground", [30] = "north", [31] = "underground",
+	[32] = "mid", [33] = "mid", [34] = "mid",
+}
+local level_zones = {}
+
+local function has_outdoor_weather(level_name)
+	local ini = game_ini()
+	return ini:line_exist("level_maps_single", level_name)
+		and ini:section_exist(level_name)
+		and (ini:r_string_ex(level_name, "weathers") == "atmosfear")
+end
+
+local function is_listed_lab(level_id)
+	for _, lab in pairs(level_targets.labs or no_links) do
+		if (lab == level_id) then
+			return true
+		end
+	end
+	return false
+end
+
+local function zone_from_neighbours(level_id)
+	local visited = { [level_id] = true }
+	local frontier = { level_id }
+	while (#frontier > 0) do
+		local counts, next_frontier = {}, {}
+		for _, lvl in ipairs(frontier) do
+			for other in pairs(linked_levels(lvl)) do
+				if not (visited[other]) then
+					visited[other] = true
+					local known = vanilla_zones[other]
+					if not (known) then
+						next_frontier[#next_frontier + 1] = other
+					elseif (known ~= "underground") then
+						counts[known] = (counts[known] or 0) + 1
+					end
+				end
+			end
+		end
+		local best, best_count, tied = nil, 0, false
+		for zone, count in pairs(counts) do
+			if (count > best_count) then
+				best, best_count, tied = zone, count, false
+			elseif (count == best_count) then
+				tied = true
+			end
+		end
+		if (best) then
+			return tied and "south" or best
+		end
+		frontier = next_frontier
+	end
+	return "south"
+end
+
+-- Cached per level until resolve_from_game_graph clears it: in fallback mode, add-ons
+-- register level_links from their actor_on_first_update.
+function level_zone(level_id)
+	if (level_id == nil) then
+		return "south"
+	end
+	local zone = level_zones[level_id]
+	if (zone) then
+		return zone
+	end
+
+	if (is_listed_lab(level_id)) then
+		zone = "underground"
+	elseif (vanilla_zones[level_id]) then
+		zone = vanilla_zones[level_id]
+	else
+		zone = has_outdoor_weather(level_name_for(level_id)) and zone_from_neighbours(level_id) or "underground"
+		warfare_log.info("level %s (%s) zone: %s", tostring(level_id), level_name_for(level_id), zone)
+	end
+	level_zones[level_id] = zone
+	return zone
+end
+
 -- Level offsets ---------------------------------------------------------------
 --
 -- A linked level no add-on gave an offset takes one from the game graph (game point =
@@ -140,6 +233,7 @@ end
 -- Runs first in warfare.build_level_information, after every add-on's
 -- actor_on_first_update, so an add-on's own offset is never pre-empted.
 function resolve_from_game_graph()
+	level_zones = {}
 	local gg = game_graph()
 	local graph_mode = has_graph_links()
 	local seen = {}

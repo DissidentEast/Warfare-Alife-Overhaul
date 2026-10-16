@@ -412,27 +412,24 @@ function faction_expansions.get_section(faction, advanced_chance, veteran_chance
         end
     elseif faction == "monster" then
         if not (IsSurvivalMode()) then
-            local current_level = veteran_chance -- using `veteran_chance` to store level number for mutants
-            -- Pick correct section by level
-            if current_level < 7 then  -- south level
+            local zone = warfare_levels.level_zone(veteran_chance) -- using `veteran_chance` to store level number for mutants
+            if zone == "south" then
                 if (r <= advanced_chance) then
                     return random_rare_south[math.random(#random_rare_south)]
                 else
                     return random_mutants_south[math.random(#random_mutants_south)]
                 end
-            elseif (current_level > 12) and (current_level < 32) then  -- north or lab level
-                if ((current_level > 19) and (current_level < 27)) or (current_level == 29) or (current_level == 31) then  -- labs will spawn scary mutants
-                    if (r <= advanced_chance) then
-                        return random_rare_labs[math.random(#random_rare_labs)]
-                    else
-                        return random_mutants_labs[math.random(#random_mutants_labs)]
-                    end
-                else  -- north level
-                    if (r <= advanced_chance) then
-                        return random_rare_north[math.random(#random_rare_north)]
-                    else
-                        return random_mutants_north[math.random(#random_mutants_north)]
-                    end
+            elseif zone == "underground" then  -- labs will spawn scary mutants
+                if (r <= advanced_chance) then
+                    return random_rare_labs[math.random(#random_rare_labs)]
+                else
+                    return random_mutants_labs[math.random(#random_mutants_labs)]
+                end
+            elseif zone == "north" then
+                if (r <= advanced_chance) then
+                    return random_rare_north[math.random(#random_rare_north)]
+                else
+                    return random_mutants_north[math.random(#random_mutants_north)]
                 end
             else  -- mid level
                 if (r <= advanced_chance) then

@@ -668,20 +668,12 @@ function resolve_monster_level_capacity()
 end
 
 function get_mutant_level_zone(level_id)
-    if not (level_id) then
-        return "south"
-    end
-
-    for _, lab_id in pairs(level_targets.labs or {}) do
-        if (lab_id == level_id) then
-            return "lab"
-        end
-    end
-
-    if (level_id > 12) and (level_id < 32) then
+    local zone = warfare_levels.level_zone(level_id)
+    if (zone == "underground") then
+        return "lab"
+    elseif (zone == "north") then
         return "north"
     end
-
     return "south"
 end
 
@@ -3930,8 +3922,7 @@ function process_mutants(smart)
                         -- Just for now, 1 in 20 chance of moving off level.
                         -- TODO: Make this an option that can be tweaked
                         if (math.random(1, 20) > 19) then
-                            local current_level = smart.level_id
-                            if not ( ((current_level > 19) and (current_level < 27)) or (current_level == 29) or (current_level == 31) ) then    -- forbid mutants inside labs from changing levels
+                            if warfare_levels.level_zone(smart.level_id) ~= "underground" then    -- forbid mutants inside labs from changing levels
                                 local keys = linked_levels(smart)
                                 local chosen = (#keys > 0) and keys[math.random(#keys)].key
                                 local level_info = chosen and warfare_levels.level_information[chosen]
@@ -5445,17 +5436,18 @@ function check_owner(smart)
 end
 
 
--- Zone helpers for storyline travel restrictions
+-- Zone helpers for storyline travel restrictions (warfare_levels.level_zone)
 local function is_south_level(lvl)
-    return (lvl < 12) or (lvl > 31)    -- 1-11 + Truck Cemetery (32) + Meadow (34)
+    local zone = warfare_levels.level_zone(lvl)
+    return (zone == "south") or (zone == "mid")
 end
 
 local function is_north_level(lvl)
-    return (lvl >= 12 and lvl <= 19) or (lvl == 27) or (lvl == 28) or (lvl == 30)
+    return warfare_levels.level_zone(lvl) == "north"
 end
 
 local function is_underground_level(lvl)
-    return (lvl >= 20 and lvl <= 26) or (lvl == 29) or (lvl == 31)
+    return warfare_levels.level_zone(lvl) == "underground"
 end
 
 local function is_scorcher_zone(lvl)
@@ -5660,8 +5652,7 @@ function find_random_patrol_target(smart, faction, sid)
         elseif (other.owning_faction == "none")    then    -- if the squad has trouble spawning, spawn them on any vacant location in the south
             priority = 0
             if other then
-                local other_level = other.level_id
-                if (other_level < 12) then    -- only south spawns
+                if is_south_level(other.level_id) then    -- only south spawns
                     priority = 1
                 end
             end
@@ -5898,7 +5889,7 @@ function find_targets(smart)
 
         -- Monolith weights southern levels down while the scorcher is active
         -- (the non-actor, non-warehouses case is already skipped above)
-        if is_monolith and is_story_mode and not has_alife_info("bar_deactivate_radar_done") and (other_level < 12 or other_level > 31) then
+        if is_monolith and is_story_mode and not has_alife_info("bar_deactivate_radar_done") and is_south_level(other_level) then
             priority = priority * 0.8
         end
 

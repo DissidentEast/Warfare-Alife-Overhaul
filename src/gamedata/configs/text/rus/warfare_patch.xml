@@ -84,6 +84,12 @@
 	<string id="ui_mm_alife_warfare_general_monster_rare_chance_lab_desc">
 		<text>Шанс на появление редкого мутанта (контролер, химера и т.д.) в лабораториях. По умолчанию: 50</text>
 	</string>
+	<string id="ui_mm_alife_warfare_general_mutant_offlevel_chance">
+		<text>Шанс смены уровня мутантами</text>
+	</string>
+	<string id="ui_mm_alife_warfare_general_mutant_offlevel_chance_desc">
+		<text>Процентный шанс, что простаивающий отряд мутантов покинет уровень при смене цели. По умолчанию: 5</text>
+	</string>
 	<string id="ui_mm_alife_warfare_general_monster_night_power_multiplier">
 		<text>Множитель силы мутантов ночью</text>
 	</string>

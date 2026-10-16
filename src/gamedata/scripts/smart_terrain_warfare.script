@@ -3856,6 +3856,32 @@ function spawn_mutants(smart)
 
 end
 
+-- A random smart from level_smarts a mutant squad may move to, or nil. Mutants never target
+-- bases; day: lairs only; night: lairs + territories + resources. A smart held by humans
+-- qualifies 1 time in 20.
+local function pick_mutant_target(level_smarts, isNight)
+    local targets = {}
+    for _, sm in pairs(level_smarts) do
+        local other = sm and alife_object(sm)
+
+        if (other) then
+            if not (other.owning_faction) then
+                check_owner(other)
+            end
+
+            local is_valid_type = other.props and (other.props.base < 1) and (
+                isNight and ((other.props.lair > 0) or (other.props.territory > 0) or (other.props.resource > 0))
+                or (other.props.lair > 0)
+            )
+            if is_valid_type and not is_quest_locked(other, "monster") and ((other.owning_faction == "none") or (math.random(1, 20) > 19)) then
+                targets[#targets+1] = other
+            end
+        end
+    end
+
+    return (#targets > 0) and targets[math.random(#targets)] or nil
+end
+
 -- Will be used for handling mutant behavior, choosing new targets etc.
 function process_mutants(smart)
     if not (process_mutant_timers[smart.id]) or (time_ref():diffSec(process_mutant_timers[smart.id]) >= process_mutant_next_update[smart.id]) then
@@ -3904,70 +3930,37 @@ function process_mutants(smart)
                         local max_active = warfare_options.options.monster_max_squads_per_level
                         local isNight = warfare_utils.is_night()
 
-                        local targets = {}
+                        local target = nil
 
-                        -- Just for now, 1 in 20 chance of moving off level.
-                        -- TODO: Make this an option that can be tweaked
-                        if (math.random(1, 20) > 19) then
-                            if warfare_levels.level_zone(smart.level_id) ~= "underground" then    -- forbid mutants inside labs from changing levels
-                                local keys = linked_levels(smart)
-                                local chosen = (#keys > 0) and keys[math.random(#keys)].key
-                                local level_info = chosen and warfare_levels.level_information[chosen]
-                                local mutants_on_level = level_info and sim_offline_combat.get_num_squads_on_level(chosen, "monster")
+                        -- forbid mutants inside labs from changing levels
+                        if (math.random(100) <= (warfare_options.options.mutant_offlevel_chance or 5))
+                        and warfare_levels.level_zone(smart.level_id) ~= "underground" then
+                            local keys = linked_levels(smart)
+                            local chosen = (#keys > 0) and keys[math.random(#keys)].key
+                            local level_info = chosen and warfare_levels.level_information[chosen]
+                            local mutants_on_level = level_info and sim_offline_combat.get_num_squads_on_level(chosen, "monster")
 
-                                if (level_info) and (mutants_on_level < max_active) then
-                                    for i,sm in pairs(level_info.smarts) do
-                                        local other = sm and alife_object(sm)
-
-                                        if not (other.owning_faction) then
-                                            check_owner(other)
-                                        end
-
-                                        -- mutants never target bases; day: lairs only; night: lairs + territories + resources
-                                        local is_valid_type = other.props and (other.props.base < 1) and (
-                                            isNight and ((other.props.lair > 0) or (other.props.territory > 0) or (other.props.resource > 0))
-                                            or (other.props.lair > 0)
-                                        )
-                                        if is_valid_type and not is_quest_locked(other, "monster") and ((other.owning_faction == "none") or ((other.owning_faction ~= "none") and (math.random(1, 20) > 19))) then    -- 1 in 20 chance of attacking a STALKER-occupied location
-                                            targets[#targets+1] = other                                                                                                    -- add possible locations to list of targets
-                                        end
-                                    end
-
-                                    if (#targets > 0) then
-                                        local target = targets[math.random(#targets)]
-                                        local num_targeting = squad_count_targeting(target, "monster")
-                                        warfare_log.debug("process_mutants: cross-level move squad=%s -> target=%s",
-                                            tostring(squad.id), target and target:name() or "?")
-                                        sim_squad_warfare.set_target(squad, target.id)
-                                    end
+                            if (level_info) and (mutants_on_level < max_active) then
+                                target = pick_mutant_target(level_info.smarts, isNight)
+                                if (target) then
+                                    warfare_log.debug("process_mutants: cross-level move squad=%s -> target=%s",
+                                        tostring(squad.id), target:name())
                                 end
                             end
-                        else
-                            local level_info = warfare_levels.level_information[smart.level_id]
-                            for i,sm in pairs(level_info.smarts) do
-                                local other = sm and alife_object(sm)
+                        end
 
-                                if not (other.owning_faction) then
-                                    check_owner(other)
-                                end
-
-                                -- mutants never target bases; day: lairs only; night: lairs + territories + resources
-                                local is_valid_type = other.props and (other.props.base < 1) and (
-                                    isNight and ((other.props.lair > 0) or (other.props.territory > 0) or (other.props.resource > 0))
-                                    or (other.props.lair > 0)
-                                )
-                                if is_valid_type and not is_quest_locked(other, "monster") and ((other.owning_faction == "none") or ((other.owning_faction ~= "none") and (math.random(1, 20) > 19))) then    -- 1 in 20 chance of attacking a STALKER-occupied location
-                                    targets[#targets+1] = other                                                                                                    -- add possible locations to list of targets
-                                end
-                            end
-
-                            if (#targets > 0) then
-                                local target = targets[math.random(#targets)]
-                                local num_targeting = squad_count_targeting(target, "monster")
+                        -- a hop that found nothing still moves the squad on its own level
+                        if not (target) then
+                            target = pick_mutant_target(warfare_levels.level_information[smart.level_id].smarts, isNight)
+                            if (target) then
                                 warfare_log.debug("process_mutants: on-level move squad=%s -> target=%s",
-                                    tostring(squad.id), target and target:name() or "?")
-                                sim_squad_warfare.set_target(squad, target.id)
+                                    tostring(squad.id), target:name())
                             end
+                        end
+
+                        if (target) then
+                            local num_targeting = squad_count_targeting(target, "monster")
+                            sim_squad_warfare.set_target(squad, target.id)
                         end
                     end
                 end

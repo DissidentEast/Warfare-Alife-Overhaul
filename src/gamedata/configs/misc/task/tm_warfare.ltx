@@ -272,7 +272,7 @@ on_job_descr = %=setup_assault_task(sim_default_bandit_trader_task_2)%
 precondition = {=validate_assault_task(sim_default_bandit_trader_task_2:1:1:nil:false:true:nil)} true, false
 repeat_timeout = 86400
 stage_complete = 1
-on_complete = %==reward_random_money(1000:3000) =reward_stash(true) =inc_task_stage(sim_default_bandit_trader_task_2) =complete_task_inc_goodwill(50:bandit)%
+on_complete = %=reward_random_money(1000:3000) =reward_stash(true) =inc_task_stage(sim_default_bandit_trader_task_2) =complete_task_inc_goodwill(50:bandit)%
 on_fail = %=fail_task_dec_goodwill(25:bandit)%
 
 condlist_0 = {!task_giver_alive(sim_default_bandit_trader_task_2)} fail
@@ -743,7 +743,7 @@ target_functor = general_fetch_task
 task_complete_descr = sim_default_csky_mechanic_task_2_fetch_finish
 on_complete = %+sim_default_csky_mechanic_upgrade_tier_2 =complete_task_inc_goodwill(50:csky) =fetch_reward_and_remove(sim_default_csky_mechanic_task_2_fetch) =inc_task_stage(sim_default_csky_mechanic_task_2)%
 precondition = {+sim_default_csky_mechanic_upgrade_tier_1 -sim_default_csky_mechanic_upgrade_tier_2} true, false
-condlist_0 = {!task_giver_alive(sim_default_csky_mechanic_task_1)} fail
+condlist_0 = {!task_giver_alive(sim_default_csky_mechanic_task_2)} fail
 
 ;--------------------------------------------------------------------------------------------------
 ; FIND LEVEL 3 TOOLS FOR CSKY MECHANICS TASK-
@@ -802,7 +802,7 @@ condlist_0 = {!task_giver_alive(sim_default_dolg_trader_task_1)} fail
 icon = ui_inGame2_Odin_vistrel
 prior = 2
 storyline = false
-title = ssim_default_dolg_trader_task_2_name
+title = sim_default_dolg_trader_task_2_name
 descr = sim_default_dolg_trader_task_2_text
 descr_functor = general_warfare_task
 job_descr = sim_default_dolg_trader_task_2_about
@@ -1633,7 +1633,7 @@ on_job_descr = %=setup_assault_task(sim_default_renegade_trader_task_2)%
 precondition = {=validate_assault_task(sim_default_renegade_trader_task_2:1:1:nil:false:true:nil)} true, false
 repeat_timeout = 86400
 stage_complete = 1
-on_complete = %==reward_random_money(1000:3000) =reward_stash(true) =inc_task_stage(sim_default_renegade_trader_task_2) =complete_task_inc_goodwill(50:renegade)%
+on_complete = %=reward_random_money(1000:3000) =reward_stash(true) =inc_task_stage(sim_default_renegade_trader_task_2) =complete_task_inc_goodwill(50:renegade)%
 on_fail = %=fail_task_dec_goodwill(25:renegade)%
 
 condlist_0 = {!task_giver_alive(sim_default_renegade_trader_task_2)} fail

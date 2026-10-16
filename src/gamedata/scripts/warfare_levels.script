@@ -502,10 +502,7 @@ function update_level(lvl)
 		level_information[lvl].next_update = math.random(30, 120)
 		
 		--printf("--- updating " .. game.translate_string(alife():level_name(lvl)) .. " ---")
-		
-		-- TODO: store the levels information in level_information. The information will contain what factions are present and their strength.
-		-- Strength will be based on the sum of all squads power. Will also store how many bases each faction owns. Resource points will be counted as well.
-				
+
 		-- clear old data; might not want to do this, as this will cause factions to re-evaluate their target level every time the current level updates.
 		-- test out how this feels when playing. Worst case, set up a temporary faction_stats table, then compare the two tables and remove factions no longer in
 		-- the temp faction_stats table.

@@ -721,13 +721,6 @@ function load_state(m_data)
     end
 
 
-    if (m_data.warfare and m_data.warfare.point_cap_timers) then
-        for smart, timer in pairs(m_data.warfare and m_data.warfare.point_cap_timers or {}) do
-            smart_terrain_warfare.point_cap_timers[smart] = timer
-        end
-    end
-
-
     warfare_squad_command.load_state(m_data.warfare)
 
     -- clear old data.

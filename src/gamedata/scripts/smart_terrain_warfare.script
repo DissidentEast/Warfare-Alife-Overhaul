@@ -191,8 +191,6 @@ function get_level_base_collection(level_id)
     return ids
 end
 
--- Timer used for capturing smart terrains.
-point_cap_timers = {}
 smart_owners = {}
 manual_point = nil
 dbg_hud = false

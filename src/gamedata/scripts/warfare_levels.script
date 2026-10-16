@@ -271,30 +271,10 @@ function update_level(lvl)
 				if level_information[lvl].faction_count == 1 then
 					level_information[lvl].faction_stats[f].faction_war = false
 				else				
-					local enemyCount, enemies = faction_enemy_present(lvl, f)
+					local enemyCount = faction_enemy_present(lvl, f)
 					level_information[lvl].faction_stats[f].faction_war = (enemyCount > 0)
 				end
 			end
-		end
-		
-		--printf("faction count for " .. game.translate_string(alife():level_name(lvl)) .. ": " .. level_information[lvl].faction_count)
-		
-		for f,tbl in pairs(level_information[lvl].faction_stats) do
-			local bc = tbl.base_count
-			local tc = tbl.territory_count
-			local rc = tbl.resource_count
-			local tp = tbl.total_power
-			local fw = tbl.faction_war
-			local ac = tbl.active_count
-			local ic = tbl.inactive_count
-			
-			--[[--printf(game.translate_string(f) .. " base_count: " .. bc)
-			--printf(game.translate_string(f) .. " territory_count: " .. tc)
-			--printf(game.translate_string(f) .. " resource_count: " .. rc)
-			--printf(game.translate_string(f) .. " total_power: " .. tp)
-			--printf(game.translate_string(f) .. " faction_war: " .. tostring(fw))
-			--printf(game.translate_string(f) .. " active_count: " .. tostring(ac))
-			--printf(game.translate_string(f) .. " inactive_count: " .. tostring(ic))]]
 		end
 	end
 

@@ -9,7 +9,7 @@
 ---
 --- Busyhands tracer (restart-required; for diagnosing engine-side crashes
 --- from invalid Lua calls):
----   warfare_log.tr_begin(tag) / tr(fmt, ...) / tr_end()
+---   warfare_log.tr_begin(tag) / tr_end()
 ---   Per-tag trace files in $logs$/warfare_trace/. Buffered and flushed
 ---   every TRACE_FLUSH_INTERVAL_SEC so the last line before a crash points
 ---   at the engine call that died.
@@ -244,17 +244,6 @@ function tr_begin(tag)
         ever_flushed = false,
         done = false,
     }
-    _in_tr = false
-end
-
-function tr(fmt, ...)
-    if _in_tr or not _busyhands_enabled or not _current_tag then return end
-    _in_tr = true
-    local buf = _trace_buffers[_current_tag]
-    if buf then
-        local lines = buf.lines
-        lines[#lines + 1] = string.format("[%s] %s", _timestamp(), _format(fmt, ...))
-    end
     _in_tr = false
 end
 

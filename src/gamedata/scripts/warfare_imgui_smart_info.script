@@ -525,7 +525,6 @@ function render_mutant_smart_info(smart)
     
     -- Resource location night-only check
     if smart.props.resource > 0 then
-        local current_hour = warfare_utils.get_warfare_hour()
         local is_night = warfare_utils.is_night()
         if not is_night then
             table.insert(block_reasons, "Resource location: Day time (spawn blocked until night)")

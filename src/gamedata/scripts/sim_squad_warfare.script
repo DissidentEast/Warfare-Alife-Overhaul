@@ -17,8 +17,6 @@
 
 
 
-dbg_map_hud = false
-
 squad_icons = {
     ["stalker"] = "warfare_stalker_spot",
     ["dolg"] = "warfare_duty_spot",
@@ -375,7 +373,6 @@ local function warfare_show(self)
     if (self.registered_with_warfare) then
         --_G.WARFARE
         local faction = self:get_squad_community()
-        local enemy = game_relations.is_factions_enemies(warfare.actor_faction, faction)
         local friend = warfare.actor_faction == faction or game_relations.is_factions_friends(warfare.actor_faction, faction)
 
         local info = ""

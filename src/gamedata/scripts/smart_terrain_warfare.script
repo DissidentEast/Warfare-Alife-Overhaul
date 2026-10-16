@@ -49,7 +49,7 @@
 
 hide_smarts = false -- altered by pda_warfare.script
 
-local sfind, is_factions_enemies, is_factions_friends = string.find, game_relations.is_factions_enemies, game_relations.is_factions_friends
+local sfind, is_factions_enemies = string.find, game_relations.is_factions_enemies
 
 -- Cached level_id → "lvl_<name>_priority" key strings (populated on first use, never changes)
 local level_priority_key_cache = {}
@@ -692,7 +692,6 @@ local clr_gr = utils_xml.get_color("ui_gray_1")
 local clr_w = utils_xml.get_color("white")
 local clr_o = utils_xml.get_color("d_orange")
 local clr_r = utils_xml.get_color("d_red")
-local clr_c = utils_xml.get_color("d_cyan")
 local clr_b = utils_xml.get_color("pda_blue")
 local clr_y = utils_xml.get_color("white")
 
@@ -1358,7 +1357,7 @@ function process_base_squads(smart)
     if supporting_invasion[smart.id] then
         local inv_base_id = supporting_invasion[smart.id]
         if invasions[inv_base_id] then
-            local regular_squads,sq_pow,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
+            local regular_squads,_,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
             local guards = math.max(guard_size, stationary_sq_num)
             if (regular_squads + stationary_sq_num > guards) then
                 local squads = SIMBOARD.smarts[smart.id].squads
@@ -1397,7 +1396,7 @@ function process_base_squads(smart)
     local isMorning = (warfare_utils.get_warfare_hour() > 7 and warfare_utils.get_warfare_hour() < 15)  -- In the morning, squads at base are given new targets or sent out for invasion
 
     local claim_targets = nil   -- ranked claimable ground, built lazily once per call
-    local regular_squads, sq_pow, stationary_sq_num = squad_count_detailed(smart, faction)  -- Get squad counts of the smart terrain owner. Does NOT count random patrol squads
+    local regular_squads, _, stationary_sq_num = squad_count_detailed(smart, faction)  -- Get squad counts of the smart terrain owner. Does NOT count random patrol squads
     local squads = SIMBOARD.smarts[smart.id].squads
 
     for sid,_ in pairs(squads) do
@@ -1784,7 +1783,7 @@ function base_has_vacancy(smart, faction)
     Returns:
         boolean true/false whether the base is within its occupancy cap
 ]]
-    local regular_squads, sq_pow, stationary_sq_num = squad_count_detailed(smart, faction)
+    local regular_squads, _, stationary_sq_num = squad_count_detailed(smart, faction)
     local max_allowable_size = base_max_allowable(smart, stationary_sq_num)
     if (regular_squads + stationary_sq_num > max_allowable_size) then
         warfare_log.trace("base_has_vacancy: full smart=%s regular=%s stat=%s max=%s",
@@ -1815,7 +1814,7 @@ function base_can_accept(smart, faction, incoming)
     Returns:
         boolean true/false whether the base can take another squad
 ]]
-    local regular_squads, sq_pow, stationary_sq_num = squad_count_detailed(smart, faction)
+    local regular_squads, _, stationary_sq_num = squad_count_detailed(smart, faction)
     local max_allowable_size = base_max_allowable(smart, stationary_sq_num)
     local en_route = (incoming and incoming[smart.id]) or 0
 
@@ -2018,7 +2017,7 @@ function process_invasion_departure(smart)
     if not invasions[smart.id] then return end
     warfare_log.trace("process_invasion_departure: smart=%s", smart:name())
 
-    local regular_squads,sq_pow,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
+    local regular_squads,_,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
     local guards = math.max(guard_size, stationary_sq_num)
     local targetID = invasions[smart.id][1]
     local target = targetID and alife_object(targetID)
@@ -2099,8 +2098,6 @@ end
 -- Targets and invasion targets will get periodically re-checked
 -- Invasions are processed and sent out by this function
 function process_targets(smart)
-    local level_id = game_graph():vertex(smart.m_game_vertex_id):level_id()
-
     if not (smart.process_targets_time) then
         smart.process_targets_time = warfare.get_time()
         smart.next_process_targets_time = math.random(6, 18)
@@ -2409,82 +2406,6 @@ function get_invasion_target(smart)
 end
 
 
--- when an empty target is detected, the closest base to the target sends a squad to capture it.
-function capture_empty_location(smart, target)
-    warfare_log.trace("capture_empty_location: smart=%s target=%s",
-        smart:name(), target and target:name() or "?")
-
-    -- disable this feature if manual control is turned on
-    if (smart.owning_faction == warfare.actor_faction) and (pda_actor.manual_control) then
-        return
-    end
-
-    local level = game_graph():vertex(target.m_game_vertex_id):level_id()
-    local linked = level_targets.level_links[level] or {}
-    local currentLevelSmarts = warfare_levels.level_information[level]
-        and warfare_levels.level_information[level].smarts or {}
-    local smartCollection = {}
-    local bases = {}
-
-    -- accumulate smart terrains on-level and on linked levels
-    for i=1,#currentLevelSmarts do
-        smartCollection[#smartCollection+1] = currentLevelSmarts[i]
-    end
-
-    for lvl,_ in pairs(linked) do
-        local smarts = warfare_levels.level_information[lvl]
-            and warfare_levels.level_information[lvl].smarts or {}
-
-        for i=1,#smarts do
-            smartCollection[#smartCollection+1] = smarts[i]
-        end
-    end
-
-    -- search for the closest friendly bases to the target
-    for i=1,#smartCollection do
-        local other = smartCollection[i] and alife_object(smartCollection[i])
-        if (other and other.props and other.props.base > 0) and (other.owning_faction == smart.owning_faction) then
-            local dist = fetch_smart_distance(other, target)
-            -- accumulate candidate bases
-            bases[#bases+1] = { dist, other.id }
-        end
-    end
-
-    table.sort(bases, function(a, b)
-        return math.abs(a[1]) < math.abs(b[1])
-    end)
-
-    for i=1,#bases do
-        local other = bases[i][2] and alife_object(bases[i][2])
-        local shortest_dist = bases[1][1]
-        local base_dist = bases[i][1]
-        local regular_squads,sq_pow,stationary_sq_num = squad_count_detailed(other, other.owning_faction)
-        local squads_available = regular_squads - math.max(guard_size, stationary_sq_num)
-
-        -- bases that are more than 60% further away from the target compared to the closest base will not be considered - except the base that called this function (since it already has the target)
-        -- only consider bases with spare squads that aren't under attack
-        if ((smart.id == other.id) or (shortest_dist*1.6 < base_dist)) and (squads_available > 0) and not under_attack[other.id] then
-            local ally_squads = SIMBOARD.smarts[other.id].squads
-
-            for sid,_ in pairs(ally_squads) do
-                local squad = resolve_roster_squad(other.id, sid)
-                local faction = squad and squad:get_squad_community()
-
-                -- only check for idle squads of same faction
-                if squad_is_commandable(squad) and (faction == other.owning_faction) and (squad.current_action == 1) then
-                    -- send the available squad
-                    warfare_log.debug("capture_empty_location: dispatch from base=%s squad=%s -> target=%s",
-                        other:name(), tostring(squad.id), target and target:name() or "?")
-                    sim_squad_warfare.set_target(squad, target.id)
-
-                    -- exit function
-                    return
-                end
-            end
-        end
-    end
-end
-
 
 -- simple version of empty capture, with no regard for smart distances (remove computation of searching tables)
 function capture_empty_location_simple(smart, target)
@@ -2495,7 +2416,7 @@ function capture_empty_location_simple(smart, target)
         return
     end
 
-    local regular_squads,sq_pow,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
+    local regular_squads,_,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
     local squads_available = regular_squads + stationary_sq_num - guard_size
     if (squads_available > 0) and not under_attack[smart.id] then
         local ally_squads = SIMBOARD.smarts[smart.id].squads
@@ -2655,7 +2576,7 @@ function create_invasion_plan(smart, target)
             power_ratio = avg_enemy_squad_power / avg_allied_squad_power
         end
 
-        local sq_num,sq_pow,sq_stat = squad_count_detailed(smart, smart.owning_faction)
+        local sq_num,_,sq_stat = squad_count_detailed(smart, smart.owning_faction)
         local x = math.random()
         local invasion_size_factor = warfare.lerp( invading_faction_props.min_invasion_size, invading_faction_props.max_invasion_size, x )            -- linear interpolation of random between min and max factors
 
@@ -2673,7 +2594,7 @@ function create_invasion_plan(smart, target)
         end
 
     else
-        local sq_num,sq_pow,sq_stat = squad_count_detailed(smart, smart.owning_faction)
+        local _,_,sq_stat = squad_count_detailed(smart, smart.owning_faction)
         local overtake_size = math.max(guard_size, sq_stat) + 1                    -- this is typically equal to 2, so only need 2 squads to overtake. Places with multiple stationary squads may need more
         invasion_force_desired = overtake_size
         invasion_force_size = overtake_size
@@ -2719,7 +2640,7 @@ function contribute_to_other_invasion(smart, skip_aggression)
         return
     end
 
-    local regular_squads,sq_pow,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
+    local regular_squads,_,stationary_sq_num = squad_count_detailed(smart, smart.owning_faction)
     local squads_available = regular_squads - math.max(guard_size, stationary_sq_num)
     local aggression = warfare_options.options.factions[smart.owning_faction].expansion_aggression
 
@@ -2736,7 +2657,7 @@ function contribute_to_other_invasion(smart, skip_aggression)
                 local invasion_base_to_target = fetch_smart_distance(other, invasion_target)
                 local support_base_to_target = fetch_smart_distance(smart, invasion_target)
                 local reinforce_dist = fetch_smart_distance(smart, other)
-                local other_sq_reg,pow,sq_stat = squad_count_detailed(other, other.owning_faction)
+                local other_sq_reg,_,sq_stat = squad_count_detailed(other, other.owning_faction)
                 local squads_needed = invasions[other.id][2] + math.max(guard_size, sq_stat) - other_sq_reg - sq_stat
 
                 -- only contribute if invasion base is closer to enemy target than support base, and squads are still needed
@@ -2758,7 +2679,7 @@ function contribute_to_other_invasion(smart, skip_aggression)
                 -- otherwise: aggression roll determines willingness to contribute
                 if (other and other.owning_faction) and (skip_aggression or (math.random(150) < aggression)) then
                     -- re-check how many squads the invasion base still needs
-                    local other_sq_reg,pow,sq_stat = squad_count_detailed(other, other.owning_faction)
+                    local other_sq_reg,_,sq_stat = squad_count_detailed(other, other.owning_faction)
                     local squads_needed = invasions[other.id][2] + math.max(guard_size, sq_stat) - other_sq_reg - sq_stat
                     if squads_needed > 0 then
                         local squads = SIMBOARD.smarts[smart.id].squads
@@ -2983,7 +2904,7 @@ function process_invasion_defense(smart)
             local other = ally_locations[i][2] and alife_object(ally_locations[i][2])
 
             if (other and other.owning_faction) then
-                local regular_squads,sq_pow,stationary_sq_num = squad_count_detailed(other,defending_faction)
+                local regular_squads,_,stationary_sq_num = squad_count_detailed(other,defending_faction)
                 local ally_squads = SIMBOARD.smarts[other.id].squads
                 local squads_available = 0
 
@@ -3110,11 +3031,8 @@ function update_resources(smart)
 
     if (warfare_factions.faction_information and warfare_factions.faction_information[smart.owning_faction]) then
         local global_resources = warfare_factions.faction_information[smart.owning_faction].resource_count
-        local levelID = game_graph():vertex(smart.m_game_vertex_id):level_id()
         local modifier = warfare_options.options.factions[smart.owning_faction].resource_count_modifier
-        local regional_resources = warfare_levels.level_information[levelID] and warfare_levels.level_information[levelID].faction_stats and warfare_levels.level_information[levelID].faction_stats[smart.owning_faction] and warfare_levels.level_information[levelID].faction_stats[smart.owning_faction].linked_resource_count or 0
-        local local_resources = warfare_levels.level_information[levelID] and warfare_levels.level_information[levelID].faction_stats and warfare_levels.level_information[levelID].faction_stats[smart.owning_faction] and warfare_levels.level_information[levelID].faction_stats[smart.owning_faction].resource_count or 0
-        local total_resources = global_resources -- + (regional_resources * 2) + (local_resources * 3)
+        local total_resources = global_resources
         smart.resource_count = total_resources + modifier
     else
         smart.resource_count = 0
@@ -4043,8 +3961,6 @@ function process_mutants(smart)
                             end
                         else
                             local level_info = warfare_levels.level_information[smart.level_id]
-                            local mutants_on_level = sim_offline_combat.get_num_squads_on_level(smart.level_id, "monster")
-
                             for i,sm in pairs(level_info.smarts) do
                                 local other = sm and alife_object(sm)
 
@@ -4248,15 +4164,10 @@ function smart_terrain.se_smart_terrain:show()
     end
 
 
-    local c = 0
-
     local faction = self.owning_faction or "none"
     local actor_faction = faction == warfare.actor_faction        -- is 'true' when the smart belongs to the player's faction
 
-    local friends = is_factions_friends(warfare.actor_faction, faction)
     local enemies = is_factions_enemies(warfare.actor_faction, faction)
-
-    local actor_level
 
     if IsWarfare() then
         -- fog of war
@@ -4979,9 +4890,7 @@ function get_warfare_info(smart, visible)
 
             if (other) then
                 local otherWarfare = translate_smart_name(other:name()) or other:name()
-                local other_level = game.translate_string(alife():level_name(other.level_id))
 
---                props = props .. "\\n" .. clr_gr .. otherWarfare .. " ("..other_level..")\\n"
                 props = props .. "\\n" .. clr_gr .. otherWarfare .. "\\n"
             end
         end
@@ -4989,7 +4898,6 @@ function get_warfare_info(smart, visible)
         if (invasions[smart.id]) then
             local other = invasions[smart.id][1] and alife_object(invasions[smart.id][1])
             local otherName = translate_smart_name(other:name())
-            local other_level = game.translate_string(alife():level_name(other.level_id))
             otherName = otherName or smart:name()
 
             --props = props .. clr_b .. " \\n \\n------------------------"
@@ -5439,10 +5347,6 @@ function check_owner(smart)
     smart.defense_power = squadPowers[owner] or 0
     -- apply distance-based combat multiplier if enabled
     smart.defense_power = smart.defense_power * get_max_power_mult(smart)
-    if (smart.defense_count > 25) then
-        local smrt_name = game.translate_string("st_" .. smart:name() .. "_name")
---        actor_menu.set_msg(1, strformat(str_wrfr[19], smrt_name, tostring(smart.defense_count)), 3) -- TODO: figure out how to stop this being spammed
-    end
 
     if not (smart.last_owner) then
         smart.last_owner = owner
@@ -5535,94 +5439,6 @@ function check_owner(smart)
 
 end
 
-
--- unused function
-function faction_enemy_present(smart, faction)
-    return
-end
-
--- unused function
-function calculate_target_density(smart)
-
-    local level = game_graph():vertex(smart.m_game_vertex_id):level_id()
-    local linked = level_targets.level_links[level]
-    local smart_collection = {}
-
-    for i=1,#warfare_levels.level_information[level].smarts do
-        smart_collection[#smart_collection+1] = warfare_levels.level_information[level].smarts[i]
-    end
-
-    for lvl,_ in pairs(linked) do
-        for i=1,#warfare_levels.level_information[lvl].smarts do
-            smart_collection[#smart_collection+1] = warfare_levels.level_information[level].smarts[i]
-        end
-    end
-
-    local targets = {}
-
-    local enemy_points = 0
-    local aggregate_distance = 0
-
-    -- bases will be considered as being closer, then owned resources are taken at their current value, while territory and lairs are viewed as being further away as they matter less.
-    local base_weight = 0.75
-    local resource_weight = 1
-    local territory_weight = 1.5
-    local lair_weight = 1.5
-
-    for i=1,#smart_collection do
-        local other = smart_collection[i] and alife_object(smart_collection[i])
-
-        if (other and other.props) then
-            local owner = other.owning_faction
-            local other_level = other.level_id
-
-            if not (smart.global_position) then
-                global_position.from(smart)
-                if not (smart.global_position) then
-                    warfare_log.warn("calculate_target_density: global_position still nil after from() smart=%s name=%s level_id=%s gvid=%s pos=%s",
-                        smart.id, smart:name(), smart.level_id, smart.m_game_vertex_id, smart.position and "ok" or "nil")
-                end
-            end
-
-            if not (other.global_position) then
-                global_position.from(other)
-                if not (other.global_position) then
-                    warfare_log.warn("calculate_target_density: global_position still nil after from() other=%s name=%s level_id=%s gvid=%s pos=%s",
-                        other.id, other:name(), other_level, other.m_game_vertex_id, other.position and "ok" or "nil")
-                end
-            end
-
-            local dist = warfare.distance_to_xz_sqr(smart.global_position, other.global_position)
-
-            if owner and owner ~= "none" and (is_factions_enemies(smart.owning_faction, owner) or (warfare_behavior.holdings_are_open(owner) and other.props.base < 1)) then                -- include open-holdings resources in targeting
-                local points = 0
-
-                if (other.props.base > 0) then
-                    points = 1.5
-                elseif (other.props.resource > 0) then
-                    points = 1.2
-                elseif (other.props.territory > 0) then
-                    points = 1.0
-                elseif (other.props.lair > 0) then
-                    points = 0.75
-                end
-
-                -- Distant levels shouldn't be included in the weight as much.
-                if (other_level ~= level) then
-                    points = points * 0.5
-                end
-
-                aggregate_distance = aggregate_distance + dist
-                enemy_points = enemy_points + points
-            end
-        end
-    end
-
-    local final_distance = aggregate_distance / enemy_points
-
-
-    return final_distance
-end
 
 -- Zone helpers for storyline travel restrictions
 local function is_south_level(lvl)

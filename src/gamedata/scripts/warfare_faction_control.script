@@ -913,7 +913,6 @@ function possess_squad_leader(squad)
     
     -- cancel all tasks
     local task_info = task_manager.get_task_manager().task_info
-    local task_ini = task_manager.task_ini
     for task_id,tbl in pairs(task_info) do
         --if not (tbl.storyline) then
             tbl.forced_status = "fail"

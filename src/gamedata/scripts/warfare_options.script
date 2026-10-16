@@ -414,38 +414,6 @@ function update_settings()
     warfare_relations.invalidate()
 end
 
-ENABLE_MUTANT_OFFLINE_COMBAT = true
-
--- when true, offline combat will only simulate when squads reach their targets.
--- This will have the faction wars update more quickly typically and likely offer greater stability, but at the expense of making it
--- harder to hold territory.
---SIMULATE_OFFLINE_COMBAT_AT_SMARTS = false
-
--- disable the offline combat simulator; this will lead to the faction wars primarily updating around the player.
--- recommend using large alife distance if you do this. will likely lead to a slower paced and easier faction war for the player.
---DISABLE_OFFLINE_COMBAT = false
-
--- TODO:
--- Show all smarts. None = gray, neutral = yellow, enemy = red, friend = green, ally = blue?
-SHOW_ALL_SMARTS = false
-
--- Show all squads. Neutral = yellow, enemy = red, friend = green
-SHOW_ALL_SQUADS = false
-
-RANDOMIZE_SQUAD_COUNT = false
-SQUAD_COUNT_MIN = 2
-SQUAD_COUNT_MAX = 4
-
-function override_functions()
-    warfare_log.info("warfare_options.override_functions: replacing heli_alife.update and sim_squad_scripted updates")
-    heli_alife.update = heli_alife_warfare.update
-    heli_alife.force_target_destination = heli_alife_warfare.force_target_destination
-    sim_squad_scripted.sim_squad_scripted.generic_update = function(self)
-    end
-    sim_squad_scripted.sim_squad_scripted.specific_update = function(self, script_target_id)
-    end
-end
-
 function get_random_start_location()
     warfare_log.debug("warfare_options.get_random_start_location: picking random start")
 
@@ -458,7 +426,7 @@ function get_random_start_location()
         n = loc_ini:line_count(f .. "_start_locations") or 0
 
         for i = 0, n - 1 do
-            local result, id, value = loc_ini:r_line(f .. "_start_locations", i, "", "")
+            local _, id = loc_ini:r_line(f .. "_start_locations", i, "", "")
             table.insert(start_table, id)
         end
     end

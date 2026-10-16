@@ -49,7 +49,6 @@ all_factions = {
 }
 
 faction_information = {}
-faction_timers = {}
 
 for i = 1, #factions do
     factions_p[factions[i]] = true
@@ -556,33 +555,6 @@ function emergency_resurrection_spawn(faction)
     end
 
     return true
-end
-
--- Helper function to check if a smart terrain is a main faction base
-function is_main_faction_base(smart, faction)
-    if not smart or not faction or faction == "none" then
-        warfare_log.trace("is_main_faction_base: invalid args smart=%s faction=%s", tostring(smart), tostring(faction))
-        return false
-    end
-
-    -- This is a simple heuristic - you may want to customize this
-    -- Main bases typically have high max_population and are bases (not resources)
-    if smart.props and smart.props.base and smart.props.base > 0 then
-        if smart.max_population and smart.max_population >= 8 then
-            return true
-        end
-
-        -- You can add specific smart terrain name checks here if needed
-        local name = smart:name()
-        if name then
-            -- Add main base names if you know them, e.g.:
-            -- if string.find(name, "bar_") or string.find(name, "freedom_base") then
-            --     return true
-            -- end
-        end
-    end
-
-    return false
 end
 
 

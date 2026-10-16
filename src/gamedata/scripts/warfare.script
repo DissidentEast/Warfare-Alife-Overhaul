@@ -51,7 +51,6 @@ end]]
 
 squad_community_by_behaviour["trader"] = "trader"
 
-warfare_debug = false
 dbg_all_faction_tooltips = false  -- debug: show full own-faction tooltip info for all squads and smarts
 
 actor_faction = nil
@@ -60,7 +59,6 @@ influence_levels = {} -- influence_levels[smart_terrain_id] = influence_level if
 
 base_count = 0
 resource_count = 0
-level_count = 32
 initialized = false
 
 -- Tracks the game time at the last warfare update for delta computation
@@ -510,7 +508,6 @@ function save_state(m_data)
 
     m_data.warfare.patrol_squads = smart_terrain_warfare.patrol_squads
     m_data.warfare.faction_information = warfare_factions.faction_information
-    m_data.warfare.new_surge = new_surge or true
 
     m_data.warfare.spawn_mutant_timers = smart_terrain_warfare.spawn_mutant_timers
     m_data.warfare.spawn_mutant_next_update = smart_terrain_warfare.spawn_mutant_next_update
@@ -567,14 +564,12 @@ function save_state(m_data)
     warfare_log.info("save_state: persisted %s registered squads", squad_total)
 end
 
-loaded_squads = false
 -- Reason string ("new game" / "legacy save") when the spawn-timer stagger is armed, else nil.
 -- Armed by fill_start_position or load_state; consumed by stagger_spawn_timers.
 --
 -- Mirrored into alife_storage_manager state because GAMMA autosaves a freshly created new game
 -- and immediately loads it: the script VM reloads in between, which wipes a plain module-level
--- flag before stagger_spawn_timers ever runs. Same trick fill_start_position_on_load uses with
--- warfare_filled_start_position.
+-- flag before stagger_spawn_timers ever runs.
 pending_spawn_stagger = nil
 
 function arm_spawn_stagger(reason)
@@ -669,9 +664,6 @@ function load_state(m_data)
     warfare_relations.flush_accum = m_data.warfare and m_data.warfare.relation_flush_accum or 0
     warfare_relations.purge_stale()
 
-    new_surge = m_data.warfare and m_data.warfare.new_surge or true
-
-
     for smart, squads in pairs(m_data.warfare and m_data.warfare.patrol_squads or {}) do
         for squad_id, tbl in pairs(squads) do
             if type(tbl) == "number" then
@@ -701,7 +693,6 @@ function load_state(m_data)
                 purged = purged + 1
             else
                 registered_squads[faction][ID] = target
-                loaded_squads = true
                 restored = restored + 1
             end
         end
@@ -741,7 +732,6 @@ end
 -- last update time
 local last_update
 
-local new_surge = true
 local old_surge_cnt
 
 -- callback for the actors update method
@@ -866,23 +856,6 @@ function actor_on_update()
     end
     old_surge_cnt = new_surge_cnt
 
-    --[[
-    local sg = surge_manager.get_surge_manager()
-    if (sg.started) then
-        if (new_surge) then
-            local t = sg.inited_time
-            local diff_sec = math.ceil(get_time_ref():diffSec(t)/level.get_time_factor())
-
-            if (diff_sec >= 170) then
-                new_surge = false
-                snap()
-            end
-        end
-    else
-        new_surge = true
-    end
-    --]]
-
 end
 
 function initialize()
@@ -892,10 +865,6 @@ function initialize()
     initialized = true
 
 end
-
-warfare_positions_filled = false
-
-FACTION_TERRITORY_RADIUS = 100
 
 function shuffleTable(t)
     local rand = math.random
@@ -1199,52 +1168,6 @@ function fill_start_position()
     warfare_log.info("fill_start_position: complete")
 end
 
--- force squads to target nearest smarts on new warfare game, on_game_load compatibility
-function fill_start_position_on_load()
-    if alife_storage_manager.get_state().warfare_filled_start_position then
-        warfare_log.trace("fill_start_position_on_load: already filled, skipping")
-        return
-    end
-    warfare_log.info("fill_start_position_on_load: retargeting squads to nearest smarts")
-    alife_storage_manager.get_state().warfare_filled_start_position = true
-
-    local function get_nearest_smart_id(squad)
-        local dist
-        local min_dist
-        local nearest
-
-        for name, smart in warfare_levels.supported_smarts() do
-            local dist = smart.position:distance_to(squad.position)
-            if (not min_dist) then
-                min_dist = dist
-                nearest = smart
-            elseif (dist < min_dist) then
-                min_dist = dist
-                nearest = smart
-            end
-        end
-        if (nearest) then
-            if (simulation_objects.is_on_the_same_level(nearest, squad)) then
-                return nearest.id
-            end
-        end
-    end
-
-    local retargeted = 0
-    for id, v in pairs(SIMBOARD.squads) do
-        local squad = alife_object(id)
-        local section = squad and squad:section_name()
-        if section and registered_squads[squad.player_id] and owns_section(section, true) then
-            local smart_id = get_nearest_smart_id(squad)
-            if smart_id then
-                sim_squad_warfare.set_target(squad, smart_id)
-                retargeted = retargeted + 1
-            end
-        end
-    end
-    warfare_log.info("fill_start_position_on_load: retargeted %s squads", retargeted)
-end
-
 -- Back-date each owned base's defense/patrol timer by a random slice of that base's own current
 -- respawn interval, so first spawns land spread across 0..interval instead of every base of a
 -- faction firing in one wave. Armed for a new game (fill_start_position) or for a legacy save
@@ -1337,7 +1260,6 @@ function initialize_random_starting_locations()
     table.insert(start_pos, base.m_game_vertex_id)
     table.insert(start_pos, base.position)
 
-    local id = smart_terrain.nearest_to_actor_smart.id
     local starting_smarts = {}
     local used_smarts = {}
 

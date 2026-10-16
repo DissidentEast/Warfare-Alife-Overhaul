@@ -55,10 +55,6 @@ local function clamp_int(v, lo, hi)
     return math.max(lo, math.min(hi, math.floor(tonumber(v) or lo)))
 end
 
-function is_active()
-    return phase ~= nil and phase ~= "asking"
-end
-
 function arm()
     local st = storage()
     if not st then

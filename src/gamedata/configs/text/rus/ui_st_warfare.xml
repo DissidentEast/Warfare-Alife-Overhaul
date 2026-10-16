@@ -302,6 +302,9 @@
 	<string id="st_wrfr_sim_12">
 		<text>Уровень цели</text>
 	</string>
+	<string id="st_wrfr_sim_13">
+		<text>В бою (противник: %s)</text>
+	</string>
 	<string id="st_wrfr_ap_unknown">
 		<text>Цель неизвестна</text>
 	</string>

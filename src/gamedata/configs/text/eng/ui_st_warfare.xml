@@ -302,6 +302,9 @@
 	<string id="st_wrfr_sim_12">
 		<text>Target level</text>
 	</string>
+	<string id="st_wrfr_sim_13">
+		<text>In combat vs %s</text>
+	</string>
 	<string id="st_wrfr_ap_unknown">
 		<text>Unknown activity</text>
 	</string>

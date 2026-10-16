@@ -60,6 +60,7 @@ function refresh_strings()
     str_wrfr[17] = game.translate_string("st_goodwill_enemy")
     str_wrfr[18] = game.translate_string("st_goodwill_indifferent")
     str_wrfr[19] = game.translate_string("st_goodwill_friendly")
+    str_wrfr[20] = game.translate_string("st_wrfr_sim_13")
 end
 
 function translate_smart_name(name)
@@ -589,6 +590,17 @@ function get_squad_relation(squad_id)
 end
 -- xr_Sanya
 
+-- Status line for a squad locked in offline combat. A lock can outlive its foe and the id be
+-- reused, so the foe is named only while the id is still a squad.
+local function combat_status(squad)
+    local foe = alife_object(sim_offline_combat.opponents[squad.id])
+    if foe and foe:clsid() == clsid.online_offline_group_s then
+        local community = foe:get_squad_community()
+        return strformat(str_wrfr[20], warfare_names.faction_names[community] or community)
+    end
+    return str_wrfr[5]
+end
+
 -- Builds squad tooltip info. full_detail adds power, patrol, and target details.
 function get_squad_info(squad, full_detail, show_target)
     warfare_log.trace("get_squad_info: squad=%s full=%s", squad and squad.id or "?", full_detail and "y" or "n")
@@ -685,7 +697,7 @@ function get_squad_info(squad, full_detail, show_target)
             if ap_status then
                 props = props .. " \\n" .. ap_status .. " \\n"
             elseif sim_offline_combat.opponents[squad.id] then
-                props = props .. " \\n" .. str_wrfr[5] .. " \\n"
+                props = props .. " \\n" .. combat_status(squad) .. " \\n"
             elseif (squad.current_action == 0) then
                 props = props .. " \\n" .. str_wrfr[6] .. " \\n"
 
@@ -723,7 +735,7 @@ function get_squad_info(squad, full_detail, show_target)
         if ap_status then
             props = props .. " \\n" .. ap_status .. " \\n"
         elseif sim_offline_combat.opponents[squad.id] then
-            props = props .. " \\n" .. str_wrfr[5] .. " \\n"
+            props = props .. " \\n" .. combat_status(squad) .. " \\n"
         elseif (squad.current_action == 0) then
             props = props .. " \\n" .. str_wrfr[6] .. " \\n"
         elseif (squad.current_action == 1) then

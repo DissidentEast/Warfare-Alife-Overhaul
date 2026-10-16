@@ -559,6 +559,8 @@ function save_state(m_data)
         m_data.warfare.smart_owners[smart.id] = smart.owning_faction
     end
 
+    m_data.warfare.point_cap_timers = smart_terrain_warfare.point_cap_timers
+
     warfare_squad_command.save_state(m_data.warfare)
 
     warfare_log.info("save_state: persisted %s registered squads", squad_total)

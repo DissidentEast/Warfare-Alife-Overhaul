@@ -317,7 +317,7 @@ function update_faction(faction)
 
                         local attempted = false
                         for _, v in pairs(levels) do
-                            local chosen = v.key
+                            local chosen = v.value
                             local info = warfare_levels.level_information[chosen]
 
                             if (info) then
@@ -404,7 +404,7 @@ function emergency_resurrection_spawn(faction)
 
     -- Step 1: Collect all possible targets across all levels
     for _,v in pairs(levels) do
-        local chosen = v.key
+        local chosen = v.value
         local info = warfare_levels.level_information[chosen]
 
         if (info) then
@@ -497,7 +497,7 @@ function emergency_resurrection_spawn(faction)
     local best_spawn_dist = nil
 
     for _,v in pairs(levels) do
-        local chosen = v.key
+        local chosen = v.value
         local info = warfare_levels.level_information[chosen]
 
         if (info) then

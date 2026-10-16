@@ -445,6 +445,12 @@
 	<string id="ui_mm_alife_warfare_faction_lvl_k02_trucks_cemetery_priority_desc">
 		<text>Flat priority added to every target in the Truck Cemetery. Positive values draw this faction toward the level, negative values push it away.</text>
 	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_y04_pole_priority">
+		<text>Level (Meadow) priority</text>
+	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_y04_pole_priority_desc">
+		<text>Flat priority added to every target in the Meadow. Positive values draw this faction toward the level, negative values push it away.</text>
+	</string>
 	<!-- Warfare preset save/delete UI -->
 	<string id="ui_mm_warfare_preset_save">
 		<text>Save preset</text>

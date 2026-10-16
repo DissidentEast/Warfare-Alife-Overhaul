@@ -120,6 +120,7 @@ function ui_options.init_opt_coder()
             { id = "lvl_jupiter_priority", type = "track", val = 2, def = 0, min = -100, max = 100, step = 1 },
             { id = "lvl_jupiter_underground_priority", type = "track", val = 2, def = 0, min = -100, max = 100, step = 1 },
             { id = "lvl_pripyat_priority", type = "track", val = 2, def = 0, min = -100, max = 100, step = 1 },
+            { id = "lvl_y04_pole_priority", type = "track", val = 2, def = 0, min = -100, max = 100, step = 1 },
         } },
         { id = "faction_patrols", featured = { "patrol_squads", "random_patrols" }, rows = {
             { id = "patrol_squads", type = "track", val = 2, def = 1, min = 0, max = 5, step = 1 },

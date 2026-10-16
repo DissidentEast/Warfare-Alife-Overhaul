@@ -440,6 +440,12 @@
 	<string id="ui_mm_alife_warfare_faction_lvl_k02_trucks_cemetery_priority_desc">
 		<text>Постоянная надбавка к приоритету всех целей на Кладбище техники. Положительные значения притягивают фракцию к этому уровню, отрицательные — отталкивают.</text>
 	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_y04_pole_priority">
+		<text>Поляна, Приоритет</text>
+	</string>
+	<string id="ui_mm_alife_warfare_faction_lvl_y04_pole_priority_desc">
+		<text>Постоянная надбавка к приоритету всех целей на Поляне. Положительные значения притягивают фракцию к этому уровню, отрицательные — отталкивают.</text>
+	</string>
 	<!-- Warfare preset save/delete UI -->
 	<string id="ui_mm_warfare_preset_save">
 		<text>Сохранить</text>

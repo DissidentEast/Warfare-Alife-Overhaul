@@ -388,6 +388,8 @@ function update_settings()
         for _, lvl in pairs(level_targets.level_names) do
             options.factions[faction]["lvl_" .. lvl .. "_priority"] = ui_options.get("alife/warfare/" .. faction .. "/lvl_" .. lvl .. "_priority")
         end
+        -- not in level_targets.level_names
+        options.factions[faction].lvl_y04_pole_priority = ui_options.get("alife/warfare/" .. faction .. "/lvl_y04_pole_priority")
 
         -- Behavior traits, read as a block so warfare_behavior owns their names and defaults.
         local behavior = {}

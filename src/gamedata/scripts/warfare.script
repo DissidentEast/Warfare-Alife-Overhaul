@@ -481,6 +481,7 @@ function build_level_information()
     warfare_levels.enroll_active_levels()
 
     smart_terrain_warfare.resolve_monster_level_capacity()
+    smart_terrain_warfare.derive_lab_entrances()
 end
 
 -- save warfare state

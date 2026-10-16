@@ -141,6 +141,11 @@ local vanilla_zones = {
 }
 local level_zones = {}
 
+-- Whether level_id is a vanilla level with a listed zone.
+function is_vanilla_level(level_id)
+	return (level_id ~= nil) and (vanilla_zones[level_id] ~= nil)
+end
+
 local function has_outdoor_weather(level_name)
 	local ini = game_ini()
 	return ini:line_exist("level_maps_single", level_name)

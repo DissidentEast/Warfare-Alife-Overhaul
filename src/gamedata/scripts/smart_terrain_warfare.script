@@ -601,6 +601,62 @@ function resolve_monster_level_capacity()
     end
 end
 
+local LAB_ENTRANCE_RADIUS = 60
+local LAB_ENTRANCE_NEAREST_MAX = 150
+
+local function changer_destination_level(se, gg)
+    local ok, dest = pcall(function() return se.dest_game_vertex_id end)
+    if not (ok and dest and gg:valid_vertex_id(dest)) then
+        return nil
+    end
+    return gg:vertex(dest):level_id()
+end
+
+-- Marks smarts at level changers into underground levels as lab entrances, for changers that
+-- touch a non-vanilla level; vanilla entrances come from warfare_smarts.ltx. Every smart within
+-- LAB_ENTRANCE_RADIUS of the changer counts, else the nearest one within LAB_ENTRANCE_NEAREST_MAX.
+-- Needs the exe's cse_alife_level_changer.dest_game_vertex_id; without it nothing is derived.
+function derive_lab_entrances()
+    local gg = game_graph()
+    local changers, added = 0, 0
+    for id = 1, 65534 do
+        local se = alife_object(id)
+        if (se) and (se:clsid() == clsid.level_changer_s) then
+            changers = changers + 1
+            local src = gg:vertex(se.m_game_vertex_id):level_id()
+            local dest = changer_destination_level(se, gg)
+            local li = warfare_levels.level_information[src]
+            if (dest) and (li)
+                    and not (warfare_levels.is_vanilla_level(src) and warfare_levels.is_vanilla_level(dest))
+                    and (warfare_levels.level_zone(dest) == "underground")
+                    and (warfare_levels.level_zone(src) ~= "underground") then
+                local near, nearest, nearest_dist = {}, nil, LAB_ENTRANCE_NEAREST_MAX
+                for _, sid in pairs(li.smarts) do
+                    local smart = alife_object(sid)
+                    local dist = smart and smart.position:distance_to(se.position)
+                    if (dist) and (dist <= LAB_ENTRANCE_RADIUS) then
+                        near[#near + 1] = smart
+                    elseif (dist) and (dist < nearest_dist) then
+                        nearest, nearest_dist = smart, dist
+                    end
+                end
+                if (#near == 0) and (nearest) then
+                    near[1] = nearest
+                end
+                for _, smart in ipairs(near) do
+                    if not (lab_entrance_smarts[smart:name()]) then
+                        lab_entrance_smarts[smart:name()] = true
+                        added = added + 1
+                        warfare_log.info("derive_lab_entrances: %s on level %s (%s) leads into level %s (%s)",
+                            smart:name(), src, level_name_for(src) or "unknown", dest, level_name_for(dest) or "unknown")
+                    end
+                end
+            end
+        end
+    end
+    warfare_log.info("derive_lab_entrances: %s level changers, %s lab entrances added", changers, added)
+end
+
 function get_mutant_level_zone(level_id)
     local zone = warfare_levels.level_zone(level_id)
     if (zone == "underground") then

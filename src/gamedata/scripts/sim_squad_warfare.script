@@ -204,6 +204,20 @@ function add_companion_squad(squad)
     end
 end
 
+-- Rest after arriving, game seconds.
+local function get_stay_time(squad, community)
+    local is_random_patrol = smart_terrain_warfare.random_patrols[squad.id]
+    local fopts = warfare_options.options.factions[community]
+
+    if (is_random_patrol and fopts) then
+        local rest_min = fopts.min_patrol_rest_time or 0
+        local rest_max = math.max(fopts.max_patrol_rest_time or 0, rest_min)
+        return math.random(rest_min, rest_max)
+    end
+
+    return math.random(60, 360)
+end
+
 -- Modified generic_update for warfare. squad.__lock will cause generic_update not to run.
 -- Not using scripted_target / specific_update, and need to avoid the precondition check.
 function squad_warfare_update(squad)
@@ -218,7 +232,6 @@ function squad_warfare_update(squad)
             end
 
             -- Only need to check if the squad has reached its destination.
-            -- TODO: stay timer for patrol squads.
             if (squad.current_action == 0 and not squad.combat_target_id) then
                 if (se_target:clsid() == clsid.smart_terrain) then
                     local smartOwner = se_target.owning_faction or "none"
@@ -254,7 +267,7 @@ function squad_warfare_update(squad)
                                 se_target:on_after_reach(squad)
                                 squad.current_action = 1
                                 squad.arrive_time = warfare.get_time()
-                                squad.wait_time = math.random(60, 360)
+                                squad.wait_time = get_stay_time(squad, community)
                             end
                         end
                     else
@@ -285,7 +298,7 @@ function squad_warfare_update(squad)
                         se_target:on_after_reach(squad)
                         squad.current_action = 1
                         squad.arrive_time = warfare.get_time()
-                        squad.wait_time = math.random(60, 360)
+                        squad.wait_time = get_stay_time(squad, squad:get_squad_community())
                     end
                 end
             end

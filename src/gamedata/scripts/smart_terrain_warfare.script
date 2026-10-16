@@ -3322,7 +3322,6 @@ function find_patrol_target(smart,patrol_table,squad)
 end
 
 function process_patrols(smart)
-    -- TODO: interpolate between min and max respawn times (make two different sets of variables for defense and offense?)
     if not (smart.process_patrols_timer) then
         smart.process_patrols_timer = warfare.get_time()
         smart.next_process_patrols_update = math.random(180, 540)

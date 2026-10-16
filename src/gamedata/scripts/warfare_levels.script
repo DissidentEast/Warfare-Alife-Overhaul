@@ -258,6 +258,56 @@ function supported_smarts()
 	end
 end
 
+-- Graph-gated levels ----------------------------------------------------------
+--
+-- Vanilla ships these levels' smarts with sim_avail = false because the stock game
+-- graph leaves the level unconnected. When the loaded graph links the level both ways
+-- with an admitted level, each smart there whose sim_avail is the constant false is
+-- opened, for vanilla A-Life and warfare's quest-lock test alike. Without
+-- CGameGraph:level_neighbours the connection cannot be checked and they stay shut.
+local graph_gated_levels = {
+	y04_pole = true,
+}
+
+local function linked_both_ways(level_id)
+	for lvl in pairs(linked_levels(level_id)) do
+		if (linked_levels(lvl)[level_id]) and (is_level_supported(lvl)) then
+			return true
+		end
+	end
+	return false
+end
+
+-- Runs before any smart is seeded or bootstrapped, on every load: sim_avail is rebuilt
+-- from the props ini when a smart registers, so nothing here is saved.
+function open_graph_gated_smarts()
+	if not (has_graph_links()) then
+		return
+	end
+
+	local props_ini = ini_file("misc\\simulation_objects_props.ltx")
+	local open_levels = {}
+	local opened = {}
+	for name, smart in pairs(SIMBOARD.smarts_by_names) do
+		if not (smart.level_id) then
+			smart.level_id = game_graph():vertex(smart.m_game_vertex_id):level_id()
+		end
+		local lvl = smart.level_id
+		if (open_levels[lvl] == nil) then
+			open_levels[lvl] = (graph_gated_levels[level_name_for(lvl)] == true) and linked_both_ways(lvl)
+		end
+		if (open_levels[lvl]) and (props_ini:r_string_ex(name, "sim_avail") == "false") then
+			smart.sim_avail = xr_logic.parse_condlist(nil, "simulation_object", "sim_avail", "true")
+			simulation_objects.available_by_id[smart.id] = true
+			opened[lvl] = (opened[lvl] or 0) + 1
+		end
+	end
+	for lvl, count in pairs(opened) do
+		warfare_log.info("level %s (%s) is linked both ways in the game graph: opened %s smarts shipped with sim_avail = false",
+			tostring(lvl), level_name_for(lvl), count)
+	end
+end
+
 local function in_active_levels(level_id)
 	for _, lvl in pairs(level_targets.active_levels) do
 		if (lvl == level_id) then

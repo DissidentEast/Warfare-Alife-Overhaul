@@ -356,6 +356,7 @@ end
 -- and the level scan below decide on level admission.
 function build_level_information()
     warfare_levels.resolve_from_game_graph()
+    warfare_levels.open_graph_gated_smarts()
 
     warfare_log.info("build_level_information: scanning registered_squads for ghosts")
     -- The excluded-level branch below reads this to tell a warfare squad from a story squad,
@@ -947,6 +948,7 @@ function fill_start_position()
     end
 
     SIMBOARD.start_position_filled = true
+    warfare_levels.open_graph_gated_smarts()
 
     -- Arm the spawn-timer stagger. It can't be applied here (see stagger_spawn_timers),
     -- so it runs from the actor_on_update one-shot init -- possibly after GAMMA's

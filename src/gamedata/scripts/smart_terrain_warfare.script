@@ -731,12 +731,6 @@ function translate_smart_name(name)
 end
 
 function set_max_population(smart)
-    -- Skip recalculation if pop factors haven't changed since last cycle
-    if smart.pop_calculated and not warfare.pop_dirty then
-        return
-    end
-    smart.pop_calculated = true
-
     local stalker_pop_factor = warfare.get_stalker_pop_factor()
     local monster_pop_factor = warfare.get_monster_pop_factor()
 
@@ -747,6 +741,18 @@ function set_max_population(smart)
     end
     warfare_log.debug("set_max_population: smart=%s max_pop=%s default=%s",
         smart:name(), tostring(smart.max_population), tostring(smart.default_max_population))
+end
+
+-- Rescales every bootstrapped smart after a pop factor change.
+function apply_pop_factors()
+    local n = 0
+    for _, smart in warfare_levels.supported_smarts() do
+        if smart.default_max_population then
+            set_max_population(smart)
+            n = n + 1
+        end
+    end
+    warfare_log.info("apply_pop_factors: rescaled max_population on %s smarts", n)
 end
 
 

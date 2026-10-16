@@ -842,6 +842,10 @@ function actor_on_update()
         warfare_factions.update()
     end
 
+    if refresh_pop_cache() then
+        smart_terrain_warfare.apply_pop_factors()
+    end
+
     warfare_levels.update()
     warfare_factions.update()
     stagger_spawn_timers()   -- no-op unless armed; needs the base counts the two updates produce
@@ -884,17 +888,19 @@ end
 -- Cached pop factors -- refreshed each warfare update cycle via refresh_pop_cache()
 local cached_stalker_pop = nil
 local cached_monster_pop = nil
-pop_dirty = true  -- signals set_max_population to recalculate (exposed for smart_terrain_warfare)
 
+-- Returns true when a factor differs from the cached value it replaces.
 function refresh_pop_cache()
     local new_stalker = get_stalker_pop_factor_value()
     local new_monster = get_monster_pop_factor_value()
-    if new_stalker ~= cached_stalker_pop or new_monster ~= cached_monster_pop then
-        warfare_log.debug("refresh_pop_cache: pop factors changed stalker=%s monster=%s (was %s/%s)", new_stalker, new_monster, cached_stalker_pop, cached_monster_pop)
-        pop_dirty = true
+    local changed = (cached_stalker_pop ~= nil and new_stalker ~= cached_stalker_pop)
+        or (cached_monster_pop ~= nil and new_monster ~= cached_monster_pop)
+    if changed then
+        warfare_log.info("refresh_pop_cache: pop factors changed stalker=%s monster=%s (was %s/%s)", new_stalker, new_monster, cached_stalker_pop, cached_monster_pop)
     end
     cached_stalker_pop = new_stalker
     cached_monster_pop = new_monster
+    return changed
 end
 
 function get_stalker_pop_factor()

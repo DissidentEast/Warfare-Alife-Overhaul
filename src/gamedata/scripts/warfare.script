@@ -355,6 +355,8 @@ end
 -- level add-ons register their level_links/level_offsets there, and both the ghost purge
 -- and the level scan below decide on level admission.
 function build_level_information()
+    warfare_levels.resolve_from_game_graph()
+
     warfare_log.info("build_level_information: scanning registered_squads for ghosts")
     -- The excluded-level branch below reads this to tell a warfare squad from a story squad,
     -- and get_ignore_list() is self-initialising, so the sweep does not depend on on_game_load
@@ -379,7 +381,7 @@ function build_level_information()
                 reason = "not_owned"
                 release = true
             elseif not (warfare_levels.is_squad_supported(obj)) then
-                -- Warfare has no static data for this squad's level (warfare_levels.is_level_supported),
+                -- This squad's level is not admitted (warfare_levels.is_level_supported),
                 -- so the level is spawn-frozen and warfare will never target it again. Unlike the
                 -- reasons above the object is still alive, so unregistering is not enough: a squad
                 -- left registered there is updated by nobody, since registered_with_warfare also
@@ -475,6 +477,7 @@ function build_level_information()
         end
     end
     warfare_log.info("build_level_information: bootstrapped %s smarts before level/faction aggregation", tostring(bootstrapped))
+    warfare_levels.enroll_active_levels()
 
     smart_terrain_warfare.resolve_monster_level_capacity()
 end
@@ -1293,10 +1296,7 @@ function initialize_random_starting_locations()
 
             for __, t in pairs(smarts2) do
                 local s = t.value
-                local lvl = game_graph():vertex(s.m_game_vertex_id):level_id()
-                local off = level_targets.level_offsets[lvl]
-
-                if (off and s.props and s.props.base > 0) and not smart_terrain_warfare.is_smart_locked(s) then
+                if (warfare_levels.is_smart_supported(s) and s.props and s.props.base > 0) and not smart_terrain_warfare.is_smart_locked(s) then
                     local gpos = global_position.from(s)
                     local safe = true
 

@@ -103,14 +103,11 @@ function build_smart_collections()
             end
         end
 
-        local linked = level_targets.level_links[lvl]
-        if linked then
-            for linked_lvl, _ in pairs(linked) do
-                local linked_smarts = warfare_levels.level_information[linked_lvl] and warfare_levels.level_information[linked_lvl].smarts
-                if linked_smarts then
-                    for i = 1, #linked_smarts do
-                        collection[#collection + 1] = linked_smarts[i]
-                    end
+        for linked_lvl, _ in pairs(warfare_levels.linked_levels(lvl)) do
+            local linked_smarts = warfare_levels.level_information[linked_lvl] and warfare_levels.level_information[linked_lvl].smarts
+            if linked_smarts then
+                for i = 1, #linked_smarts do
+                    collection[#collection + 1] = linked_smarts[i]
                 end
             end
         end
@@ -606,7 +603,7 @@ local monster_level_capacity = {
     [31] = 5,    -- X8 [1 lair, 5 cap]
     [32] = 19,    -- Truck Cemetery [15 lairs, 19 cap]
     [33] = 0,    -- Test Level
-    [34] = 4,    -- Village
+    [34] = 2,    -- Meadow [2 lairs, 2 cap]
 }
 
 local level_name_cache = {}
@@ -1012,7 +1009,7 @@ function begin_capture(target)
 
         -- did not find an on-level base, search linked levels
         if not (#smartCollection > 0) then
-            for linked_lvl,_ in pairs(level_targets.level_links[lvl] or {}) do
+            for linked_lvl,_ in pairs(warfare_levels.linked_levels(lvl)) do
                 local smarts = warfare_levels.level_information[linked_lvl]
                     and warfare_levels.level_information[linked_lvl].smarts or {}
 
@@ -3474,6 +3471,9 @@ end
 
 local function scan_level(level_id, visit)
     local level_info = warfare_levels.level_information[level_id]
+    if not (level_info) then
+        return
+    end
     for _, sm in pairs(level_info.smarts) do
         local other = sm and alife_object(sm)
         if not (other.owning_faction) then
@@ -3484,7 +3484,7 @@ local function scan_level(level_id, visit)
 end
 
 local function linked_levels(smart)
-    return warfare.hash_table_to_array(level_targets.level_links[smart.level_id])
+    return warfare.hash_table_to_array(warfare_levels.linked_levels(smart.level_id))
 end
 
 local function scan_links(smart, visit)
@@ -3932,13 +3932,12 @@ function process_mutants(smart)
                         if (math.random(1, 20) > 19) then
                             local current_level = smart.level_id
                             if not ( ((current_level > 19) and (current_level < 27)) or (current_level == 29) or (current_level == 31) ) then    -- forbid mutants inside labs from changing levels
-                                local linked = level_targets.level_links[smart.level_id]
-                                local keys = warfare.hash_table_to_array(linked)
-                                local chosen = keys[math.random(#keys)].key
-                                local level_info = warfare_levels.level_information[chosen]
-                                local mutants_on_level = sim_offline_combat.get_num_squads_on_level(chosen, "monster")
+                                local keys = linked_levels(smart)
+                                local chosen = (#keys > 0) and keys[math.random(#keys)].key
+                                local level_info = chosen and warfare_levels.level_information[chosen]
+                                local mutants_on_level = level_info and sim_offline_combat.get_num_squads_on_level(chosen, "monster")
 
-                                if (mutants_on_level < max_active) then
+                                if (level_info) and (mutants_on_level < max_active) then
                                     for i,sm in pairs(level_info.smarts) do
                                         local other = sm and alife_object(sm)
 

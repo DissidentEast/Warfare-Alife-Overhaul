@@ -37,20 +37,142 @@
 level_timers = {}
 level_information = {}
 
+local function level_name_for(level_id)
+	local ok, name = pcall(function() return alife():level_name(level_id) end)
+	return (ok and name) or "unknown"
+end
+
+-- Level links -----------------------------------------------------------------
+--
+-- Where offline squads can travel from a level. With CGameGraph:level_neighbours
+-- (modded exes) it is the loaded game graph, cached per level for the session;
+-- without it, the static level_targets.level_links that add-ons patch, read live.
+-- Graph links are the edges leaving the level and may name levels warfare does not
+-- admit, so consumers check level_information before indexing it.
+local graph_links_available
+local graph_links = {}
+local no_links = {}
+
+local function has_graph_links()
+	if (graph_links_available == nil) then
+		local ok, available = pcall(function()
+			return (CGameGraph ~= nil) and (CGameGraph.level_neighbours ~= nil)
+		end)
+		graph_links_available = (ok and available) or false
+		warfare_log.info("level links source: %s", graph_links_available
+			and "game graph (CGameGraph:level_neighbours)" or "level_targets.level_links")
+	end
+	return graph_links_available
+end
+
+-- {[level_id] = true} for every level a squad can travel to from level_id; never nil.
+-- Shared with the cache: callers must not modify it.
+function linked_levels(level_id)
+	if (level_id == nil) then
+		return no_links
+	end
+	if not (has_graph_links()) then
+		return level_targets.level_links[level_id] or no_links
+	end
+	local links = graph_links[level_id]
+	if not (links) then
+		local ok, neighbours = pcall(function() return game_graph():level_neighbours(level_id) end)
+		links = (ok and (type(neighbours) == "table")) and neighbours or no_links
+		graph_links[level_id] = links
+	end
+	return links
+end
+
+-- From the graph, a level with no outgoing edge to another level is not admitted:
+-- squads could not leave it.
+local function has_links(level_id)
+	if (has_graph_links()) then
+		return next(linked_levels(level_id)) ~= nil
+	end
+	return level_targets.level_links[level_id] ~= nil
+end
+
+local function link_names(set)
+	local names = {}
+	for lvl in pairs(set) do
+		names[#names + 1] = tostring(lvl) .. ":" .. level_name_for(lvl)
+	end
+	table.sort(names)
+	return table.concat(names, " ")
+end
+
+local function log_link_differences(level_id)
+	local graph = linked_levels(level_id)
+	local static = level_targets.level_links[level_id] or no_links
+	local added, removed = {}, {}
+	for lvl in pairs(graph) do
+		if not (static[lvl]) then
+			added[lvl] = true
+		end
+	end
+	for lvl in pairs(static) do
+		if not (graph[lvl]) then
+			removed[lvl] = true
+		end
+	end
+	if (next(added) ~= nil) or (next(removed) ~= nil) then
+		warfare_log.info("level %s (%s) game-graph links differ from level_targets.level_links: added [%s] removed [%s]",
+			tostring(level_id), level_name_for(level_id), link_names(added), link_names(removed))
+	end
+end
+
+-- Level offsets ---------------------------------------------------------------
+--
+-- A linked level no add-on gave an offset takes one from the game graph (game point =
+-- level point + level offset), in the game_levels.ltx frame that global_position's
+-- hand-tuned overground values only approximate.
+local function fill_offset_from_graph(level_id, vertex)
+	if (global_position.level_offsets[level_id]) or not (has_links(level_id)) then
+		return
+	end
+
+	local offset = vertex:game_point():sub(vertex:level_point())
+	global_position.level_offsets[level_id] = { offset.x, offset.y, offset.z }
+	warfare_log.info("level %s (%s) not registered by an add-on: offset (%s, %s, %s) taken from the game graph",
+		tostring(level_id), level_name_for(level_id), offset.x, offset.y, offset.z)
+end
+
+-- Runs first in warfare.build_level_information, after every add-on's
+-- actor_on_first_update, so an add-on's own offset is never pre-empted.
+function resolve_from_game_graph()
+	local gg = game_graph()
+	local graph_mode = has_graph_links()
+	local seen = {}
+	local gvid = 0
+	while gg:valid_vertex_id(gvid) do
+		local vertex = gg:vertex(gvid)
+		local lvl = vertex:level_id()
+		if not (seen[lvl]) then
+			seen[lvl] = true
+			if (graph_mode) then
+				log_link_differences(lvl)
+			end
+			fill_offset_from_graph(lvl, vertex)
+		end
+		gvid = gvid + 1
+	end
+end
+
 -- Level admission -------------------------------------------------------------
 --
--- Warfare reasons about levels through two static tables it does not own:
--- level_targets.level_links (topology) and global_position.level_offsets
--- (coordinates). Both stop at level 34. level_information, by contrast, is
+-- Warfare reasons about levels through their links (linked_levels above) and
+-- global_position.level_offsets (coordinates). level_information, by contrast, is
 -- discovered at runtime from whatever smarts SIMBOARD reports, so a level added by
 -- an add-on lands in it, gets bootstrapped,
 -- owned and driven -- and then kills the process on the first lookup into a static
 -- table that has never heard of it.
 --
--- A level is admitted only when both static tables know it. Everything else is kept
--- out of warfare entirely, rather than nil-guarded at each of the ten use sites. The
--- predicate is data-driven on purpose: an add-on that supplies its own level_links
--- and level_offsets entries is admitted with no change here.
+-- A level is admitted only when it has links and an offset. Objects on any other
+-- level are kept out of warfare entirely; linked-level lookups still check
+-- level_information (see Level links). The predicate is data-driven on purpose: a
+-- level pack whose levels the game graph links (or that registers level_links,
+-- without the graph export) is admitted with no change here, and the offset comes
+-- from the graph when the pack registers none.
 --
 -- Only positive verdicts are cached. Level add-ons register their entries from their
 -- own actor_on_first_update, after warfare has already asked about their levels, so a
@@ -58,15 +180,9 @@ level_information = {}
 -- (actor_on_update one-shot) is where the admitted set is finally acted on.
 --
 -- active_levels is deliberately not part of the test. It is the aggregation roster
--- for update() below, not an eligibility list -- level 34 (y04_pole) has links and
--- offsets but no active_levels entry, and works today.
+-- for update() below, not an eligibility list.
 local level_supported = {}
 local level_support_logged = {}
-
-local function level_name_for(level_id)
-	local ok, name = pcall(function() return alife():level_name(level_id) end)
-	return (ok and name) or "unknown"
-end
 
 function is_level_supported(level_id)
 	-- A nil level_id means the object's game vertex resolves to no level at all (seen
@@ -84,22 +200,24 @@ function is_level_supported(level_id)
 		return true
 	end
 
-	local has_links = (level_targets.level_links[level_id] ~= nil)
+	local linked = has_links(level_id)
 	local has_offsets = (global_position.level_offsets[level_id] ~= nil)
-	local supported = has_links and has_offsets
+	local supported = linked and has_offsets
 	if (supported) then
 		level_supported[level_id] = true
 		if (level_support_logged[level_id]) then
-			warfare_log.info("level %s (%s) admitted to warfare: add-on registered its level_links and level_offsets",
+			warfare_log.info("level %s (%s) admitted to warfare: links and level_offsets now present",
 				tostring(level_id), level_name_for(level_id))
 		end
 	end
 
 	if not (supported) and not (level_support_logged[level_id]) then
 		level_support_logged[level_id] = true
-		warfare_log.warn("level %s (%s) excluded from warfare: level_links=%s level_offsets=%s (reported once)",
+		warfare_log.warn("level %s (%s) excluded from warfare: links=%s (%s) level_offsets=%s (reported once)",
 			tostring(level_id), level_name_for(level_id),
-			has_links and "ok" or "missing", has_offsets and "ok" or "missing")
+			linked and "ok" or "missing",
+			has_graph_links() and "game graph" or "level_targets.level_links",
+			has_offsets and "ok" or "missing")
 	end
 
 	return supported
@@ -137,6 +255,27 @@ function supported_smarts()
 			key, smart = nxt(tbl, key)
 		until (key == nil) or is_smart_supported(smart)
 		return key, smart
+	end
+end
+
+local function in_active_levels(level_id)
+	for _, lvl in pairs(level_targets.active_levels) do
+		if (lvl == level_id) then
+			return true
+		end
+	end
+	return false
+end
+
+-- update() builds faction_stats only for levels on the active_levels roster, and
+-- update_level reads them from linked levels, so every level with level_information
+-- joins it. Vanilla's roster stops at 32 (no Meadow); add-ons may append their own.
+function enroll_active_levels()
+	for lvl in pairs(level_information) do
+		if not (in_active_levels(lvl)) then
+			table.insert(level_targets.active_levels, lvl)
+			warfare_log.info("level %s (%s) added to active_levels", tostring(lvl), level_name_for(lvl))
+		end
 	end
 end
 
@@ -261,8 +400,8 @@ function update_level(lvl)
 		
 		for f,tbl in pairs(level_information[lvl].faction_stats) do
 			if f ~= "none" then
-				for lvl2,_ in pairs(level_targets.level_links[lvl]) do
-					if (level_information[lvl2] and level_information[lvl2].faction_stats[f]) then
+				for lvl2,_ in pairs(linked_levels(lvl)) do
+					if (level_information[lvl2] and level_information[lvl2].faction_stats and level_information[lvl2].faction_stats[f]) then
 						--printf("!!! adding " .. level_information[lvl2].faction_stats[f].resource_count .. " to linked resources")
 						level_information[lvl].faction_stats[f].linked_resource_count = level_information[lvl].faction_stats[f].linked_resource_count + level_information[lvl2].faction_stats[f].resource_count
 					end

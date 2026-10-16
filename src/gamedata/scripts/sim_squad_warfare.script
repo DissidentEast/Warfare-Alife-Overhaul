@@ -204,15 +204,39 @@ function add_companion_squad(squad)
     end
 end
 
--- Rest after arriving, game seconds.
-local function get_stay_time(squad, community)
-    local is_random_patrol = smart_terrain_warfare.random_patrols[squad.id]
+-- Patrol rest, game seconds, from the faction's min/max_patrol_rest_time; nil for a
+-- community without faction options.
+function patrol_rest_time(community)
     local fopts = warfare_options.options.factions[community]
+    if not (fopts) then
+        return nil
+    end
 
-    if (is_random_patrol and fopts) then
-        local rest_min = fopts.min_patrol_rest_time or 0
-        local rest_max = math.max(fopts.max_patrol_rest_time or 0, rest_min)
-        return math.random(rest_min, rest_max)
+    local rest_min = fopts.min_patrol_rest_time or 0
+    local rest_max = math.max(fopts.max_patrol_rest_time or 0, rest_min)
+    return math.random(rest_min, rest_max)
+end
+
+-- A base patrol resting at its patrol target: its rest lives in patrol_table.
+local function resting_on_patrol_table(squad)
+    local pt = squad.patrol_table
+    return pt and (not pt.attacking) and (pt.target == squad.current_target_id) and pt or nil
+end
+
+-- Rest after arriving, game seconds. A base patrol's rest starts here, in its saved
+-- patrol_table; a patrol re-arriving after a load keeps the rest it had.
+local function get_stay_time(squad, community)
+    local pt = resting_on_patrol_table(squad)
+    if (pt) then
+        if not (pt.arrive_time) then
+            pt.arrive_time = warfare.get_time()
+            pt.stay_time = patrol_rest_time(community) or 0
+        end
+        return pt.stay_time
+    end
+
+    if (smart_terrain_warfare.random_patrols[squad.id]) then
+        return patrol_rest_time(community) or math.random(60, 360)
     end
 
     return math.random(60, 360)
@@ -799,11 +823,17 @@ function squad_is_settled(squad)
 
     A squad in transit has no arrive_time -- set_target clears it -- so this is false
     while travelling and true only for a squad that has actually arrived and not yet
-    served its rest.
+    served its rest. A base patrol at its patrol target is timed by its patrol_table,
+    the same rest process_patrols waits out.
 
     Routine dispatchers (recall, overflow, morning dispatch, random patrols) must respect
     this. Combat, invasion and player orders reach set_target directly and are unaffected.
 ]]
+    local pt = squad and (squad.current_action == 1) and resting_on_patrol_table(squad)
+    if (pt and pt.arrive_time and pt.stay_time) then
+        return warfare.get_time_ref():diffSec(pt.arrive_time) < pt.stay_time
+    end
+
     if not (squad and squad.arrive_time and squad.wait_time) then
         return false
     end

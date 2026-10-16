@@ -3396,9 +3396,7 @@ function process_patrols(smart)
                 if (find_target or squad.current_action == 1) then
                     if (not find_target and not (sobj.attacking or sobj.arrive_time)) then
                         patrol_squads[smart.id][squad_id].arrive_time = warfare.get_time()
-                        local min_idle = warfare_options.options.factions[squad:get_squad_community()].min_patrol_rest_time or 0
-                        local max_idle = warfare_options.options.factions[squad:get_squad_community()].max_patrol_rest_time    or 0
-                        patrol_squads[smart.id][squad_id].stay_time = math.random(min_idle, max_idle)
+                        patrol_squads[smart.id][squad_id].stay_time = sim_squad_warfare.patrol_rest_time(squad:get_squad_community()) or 0
                     elseif (find_target or time_ref():diffSec(sobj.arrive_time) >= sobj.stay_time) then
                         local night_chance = warfare_options.options.factions[smart.owning_faction].night_activity_chance
                         local isNight = warfare_utils.is_night()

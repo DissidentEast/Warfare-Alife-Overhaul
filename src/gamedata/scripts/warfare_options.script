@@ -233,6 +233,11 @@ function update_settings()
     options.actor_influence_weight = ui_options.get("alife/warfare/general/actor_influence_weight")
     options.monster_min_faction_respawn = ui_options.get("alife/warfare/general/monster_min_faction_respawn")
     options.monster_max_faction_respawn = ui_options.get("alife/warfare/general/monster_max_faction_respawn")
+    -- The min and max sliders are independent, so the max can be dragged below the min. math.random(min, max)
+    -- then raises "interval is empty" on every spawn roll, so the max never sits below its min.
+    if options.monster_min_faction_respawn and options.monster_max_faction_respawn then
+        options.monster_max_faction_respawn = math.max(options.monster_max_faction_respawn, options.monster_min_faction_respawn)
+    end
     options.monster_max_squads_per_level = ui_options.get("alife/warfare/general/monster_max_squads_per_level")
     options.monster_max_squads_per_level_lab = ui_options.get("alife/warfare/general/monster_max_squads_per_level_lab")
 
@@ -364,6 +369,15 @@ function update_settings()
         options.factions[faction].keep_last_base = ui_options.get("alife/warfare/" .. faction .. "/keep_last_base")
         options.factions[faction].min_resurgence_wait_time = ui_options.get("alife/warfare/" .. faction .. "/min_resurgence_wait_time")
         options.factions[faction].max_resurgence_wait_time = ui_options.get("alife/warfare/" .. faction .. "/max_resurgence_wait_time")
+
+        -- Same guard as the monster respawn pair: warfare_factions rolls math.random(min, max) on both of these.
+        local ff = options.factions[faction]
+        if ff.min_resurgence_wait_time and ff.max_resurgence_wait_time then
+            ff.max_resurgence_wait_time = math.max(ff.max_resurgence_wait_time, ff.min_resurgence_wait_time)
+        end
+        if ff.min_random_patrol_time and ff.max_random_patrol_time then
+            ff.max_random_patrol_time = math.max(ff.max_random_patrol_time, ff.min_random_patrol_time)
+        end
         options.factions[faction].resurgence_chance = ui_options.get("alife/warfare/" .. faction .. "/resurgence_chance")
         --        options.factions[faction].max_active_squads_per_target         = ui_options.get("alife/warfare/"..faction.."/max_active_squads_per_target")
         options.factions[faction].min_smart_targets_per_base = ui_options.get("alife/warfare/" .. faction .. "/min_smart_targets_per_base")

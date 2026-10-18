@@ -949,10 +949,39 @@ end
 ------------------------------------------------------------
 -- Callbacks
 ------------------------------------------------------------
+
+-- warfare_show skips the hint text while the PDA is closed (it is only visible with the PDA open), so a
+-- squad's spot keeps an empty hint until that squad's next update(). Hovering it before then shows an empty
+-- tooltip box. Smart terrains already rewrite their hints as the PDA opens (smart_terrain_warfare.watch_pda);
+-- this does the same for the squads on the actor's level, once per opening.
+function refresh_squad_hints()
+    local ids = sim_offline_combat.squads_by_level[get_player_level_id()]
+    if not ids then
+        return
+    end
+
+    for squad_id in pairs(ids) do
+        local squad = alife_object(squad_id)
+        if squad and squad.warfare_spot and squad.registered_with_warfare and squad:clsid() == clsid.online_offline_group_s then
+            squad:refresh()
+        end
+    end
+end
+
+local pda_was_open = false
+local function watch_pda()
+    local open = is_pda_open()
+    if open and not pda_was_open and IsWarfare() then
+        refresh_squad_hints()
+    end
+    pda_was_open = open
+end
+
 function on_game_start()
     warfare_log.info("sim_squad_warfare.on_game_start: register on_localization_change")
     refresh_strings()
     install_map_spot_router()
 
     RegisterScriptCallback("on_localization_change", refresh_strings)
+    RegisterScriptCallback("actor_on_update", watch_pda)
 end

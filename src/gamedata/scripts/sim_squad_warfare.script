@@ -386,6 +386,30 @@ function squad_on_npc_death(squad, npc, killer)
     end
 end
 
+-- Hint text for a squad's map spot, "" while the PDA is closed (it is only visible with it open).
+-- Building the text can fail, and a failure used to leave the spot with its old, usually empty,
+-- hint: an empty tooltip box. The failure is logged once per squad and a short text is used instead.
+local hint_failed = {}
+local function squad_hint(squad, faction)
+    if not is_pda_open() then
+        return ""
+    end
+
+    local detailed = warfare.dbg_all_faction_tooltips or faction == warfare.actor_faction
+        or game_relations.is_factions_friends(faction, warfare.actor_faction)
+    local ok, info = pcall(detailed and get_warfare_info or get_enemy_info, squad)
+    if ok and type(info) == "string" and info:find("%S") then
+        return info
+    end
+
+    if not hint_failed[squad.id] then
+        hint_failed[squad.id] = true
+        warfare_log.warn("squad_hint: squad=%s section=%s faction=%s: %s", tostring(squad.id),
+            tostring(squad:section_name()), tostring(faction), ok and "empty hint text" or tostring(info))
+    end
+    return tostring(warfare_names.faction_names[faction] or faction) .. " \\n" .. tostring(squad:npc_count()) .. " " .. str_wrfr[2]
+end
+
 -- Show warfare icon. Warfare-registered squads only; installed on the class by
 -- install_map_spot_router, which sends every other squad to the show() the class had before.
 local function warfare_show(self)
@@ -412,14 +436,7 @@ local function warfare_show(self)
         local faction = self:get_squad_community()
         local friend = warfare.actor_faction == faction or game_relations.is_factions_friends(warfare.actor_faction, faction)
 
-        local info = ""
-        if is_pda_open() then
-            if (warfare.dbg_all_faction_tooltips or self:get_squad_community() == warfare.actor_faction or game_relations.is_factions_friends(self:get_squad_community(), warfare.actor_faction)) then
-                info = get_warfare_info(self)
-            else
-                info = get_enemy_info(self)
-            end
-        end
+        local info = squad_hint(self, faction)
 
         if smart_terrain_warfare.fog_active() then
             local range_sqr = smart_terrain_warfare.fog_radius_sqr(false)
@@ -960,12 +977,15 @@ function refresh_squad_hints()
         return
     end
 
+    local count = 0
     for squad_id in pairs(ids) do
         local squad = alife_object(squad_id)
         if squad and squad.warfare_spot and squad.registered_with_warfare and squad:clsid() == clsid.online_offline_group_s then
             squad:refresh()
+            count = count + 1
         end
     end
+    warfare_log.info("refresh_squad_hints: PDA opened, redrew %s squad hints", count)
 end
 
 local pda_was_open = false
